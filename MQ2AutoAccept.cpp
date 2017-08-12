@@ -4,14 +4,16 @@
 // v1.02 - Sym - 09-27-2012 - Added GlobalNames ini section. Needs to be edited in ini file, add/del does not affect globals.
 // v1.03 - Eqmule - 04-23-2016 - removed ParseMacroData because this is a plugin not a macro ;) added accept for another dialog.
 // v2.0 - Eqmule 07-22-2016 - Added string safety.
-// v2.1 - Sym 07-23-2017 - Added specific anchor name checking and addanchor/delanchor commands.
+// v2.1 - Sym - 07-23-2017 - Added specific anchor name checking and addanchor/delanchor commands.
 //    /autoaccept addanchor VALUE :: Add VALUE as a valid anchor target. Proper case matters for matching later. Put the entire address inside quotes as it shows in the portal dialog box such as "Willow Circle Bay, 100 Vanward Heights"
 //    /autoaccept delanchor VALUE :: Delete VALUE from your valid anchor target list. Put the entire address inside quotes as it shows in the portal dialog box such as "Willow Circle Bay, 100 Vanward Heights"
-
+// v2.11 - Sym - 07-28-2017 - Cleaned up anchor port code, added selfanchor option
+//    /autoaccept selfanchor on|off :: Toggle acceptance of primary/secondary real estate anchor port when you cast it.  Default *OFF*
+// v2.12 - Sym - 08-07-2017 - Added wizard translocate and druid zephyr casts to translocate toggle. Previously it was translocate to bind only.
 
 #include "../MQ2Plugin.h"
 #include <vector>
-PLUGIN_VERSION(2.1);
+PLUGIN_VERSION(2.12);
 
 #pragma warning(disable:4800)
 PreSetup("MQ2AutoAccept");
@@ -32,6 +34,7 @@ char szAnchors[MAX_STRING];
 bool bAutoAccept = false;
 bool bTranslocate = false;
 bool bAnchor = false;
+bool bSelfAnchor = false;
 bool bTrade = true;
 bool bTradeAlways = false;
 bool bGroup = true;
@@ -89,6 +92,7 @@ VOID SaveINI(VOID)
     WritePrivateProfileString(szTemp,"Enabled",bAutoAccept ? "1" : "0",INIFileName);
     WritePrivateProfileString(szTemp,"Translocate",bTranslocate ? "1" : "0",INIFileName);
     WritePrivateProfileString(szTemp,"Anchor",bAnchor ? "1" : "0",INIFileName);
+    WritePrivateProfileString(szTemp,"SelfAnchor",bSelfAnchor ? "1" : "0",INIFileName);
     WritePrivateProfileString(szTemp,"Trade",bTrade ? "1" : "0",INIFileName);
     WritePrivateProfileString(szTemp,"TradeAlways",bTradeAlways ? "1" : "0",INIFileName);
     WritePrivateProfileString(szTemp,"TradeReject",bTradeReject ? "1" : "0",INIFileName);
@@ -124,6 +128,7 @@ VOID LoadINI(VOID)
     bAutoAccept = GetPrivateProfileInt(szTemp, "Enabled", 1, INIFileName) > 0 ? true : false;
     bTranslocate = GetPrivateProfileInt(szTemp, "Translocate", 0, INIFileName) > 0 ? true : false;
     bAnchor = GetPrivateProfileInt(szTemp, "Anchor", 0, INIFileName) > 0 ? true : false;
+    bSelfAnchor = GetPrivateProfileInt(szTemp, "SelfAnchor", 0, INIFileName) > 0 ? true : false;
     bTrade = GetPrivateProfileInt(szTemp, "Trade", 1, INIFileName) > 0 ? true : false;
     bTradeAlways = GetPrivateProfileInt(szTemp, "TradeAlways", 0, INIFileName) > 0 ? true : false;
     bTradeReject = GetPrivateProfileInt(szTemp, "TradeReject", 0, INIFileName) > 0 ? true : false;
@@ -215,7 +220,7 @@ VOID LoadINI(VOID)
     // loop through all entries under _Names
     // values are terminated by \0, final value is teminated with \0\0
     // values look like
-    // Charactername=1
+    // Anchor0=anchorname
     while (*p)
     {
         length = strlen(p);
@@ -254,8 +259,9 @@ void ShowHelp(void) {
     WriteChatf("\atMQ2AutoAccept :: v%1.2f :: by Sym for RedGuides.com\ax", MQ2Version);
     WriteChatf("/autoaccept :: Lists command syntax");
     WriteChatf("/autoaccept on|off :: Main accept toggle. Nothing else will accept if this is off. Default \ag*ON*\ax");
-    WriteChatf("/autoaccept translocate on|off :: Toggle acceptance of translocate port.  Default \ar*OFF*\ax");
+    WriteChatf("/autoaccept translocate on|off :: Toggle acceptance of translocate or zephyr port.  Default \ar*OFF*\ax");
     WriteChatf("/autoaccept anchor on|off :: Toggle acceptance of primary/secondary real estate anchor port.  Default \ar*OFF*\ax");
+    WriteChatf("/autoaccept selfanchor on|off :: Toggle acceptance of primary/secondary real estate anchor port when you cast it.  Default \ar*OFF*\ax");
     WriteChatf("/autoaccept trade on|off :: Toggle acceptance of trades by people on the auto accept list. Default \ag*ON*\ax");
     WriteChatf("/autoaccept trade always on|off :: Toggles always accept all trades. Default \ar*OFF*\ax");
     WriteChatf("/autoaccept trade reject on|off :: Reject trades for people not on auto accept list after 5 seconds. Default \ar*OFF*\ax");
@@ -287,6 +293,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
     if(!_strnicmp(szTemp,"status",6)) {
         WriteChatf("MQ2AutoAccept :: %s", bAutoAccept ? "\agENABLED\ax" : "\arDISABLED\ax");
         WriteChatf("MQ2AutoAccept :: Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
+        WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
         WriteChatf("MQ2AutoAccept :: Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
         WriteChatf("MQ2AutoAccept :: Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
         WriteChatf("MQ2AutoAccept :: Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
@@ -373,6 +380,15 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
         } else {
             WriteChatf("MQ2AutoAccept :: User \ay%s\ax not found", szTemp);
         }
+    }
+    else if(!_strnicmp(szTemp,"selfanchor",10)) {
+        GetArg(szTemp,zLine,2);
+        if(!_strnicmp(szTemp,"on",2)) {
+            bSelfAnchor = true;
+        } else if(!_strnicmp(szTemp,"off",2)) {
+            bSelfAnchor = false;
+        }
+        WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
     }
     else if(!_strnicmp(szTemp,"anchor",6)) {
         GetArg(szTemp,zLine,2);
@@ -585,8 +601,6 @@ PLUGIN_API VOID OnPulse(VOID) {
                                 if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
                                     WriteChatf("\agMQ2AutoAccept :: Accepting trade from %s\ax", szTemp);
                                     SendWndClick2(pTRDW_Trade_Button,"leftmouseup");
-                                    //DoCommand(GetCharInfo()->pSpawn, "/nomodkey /notify TradeWnd TRDW_Trade_Button leftmouseup");
-                                    //DoCommand(GetCharInfo()->pSpawn, "/nomodkey /squelch target clear");
                                     pTarget = NULL;
                                 }
                             }
@@ -600,7 +614,6 @@ PLUGIN_API VOID OnPulse(VOID) {
                                 if (CXWnd* pTRDW_Cancel_Button = pTradeWnd->GetChildItem("TRDW_Cancel_Button")) {
                                     WriteChatf("\arMQ2AutoAccept :: Canceling Trade\ax");
                                     SendWndClick2(pTRDW_Cancel_Button,"leftmouseup");
-                                    //DoCommand(GetCharInfo()->pSpawn, "/nomodkey /notify TradeWnd TRDW_Cancel_Button leftmouseup");
                                 }
                             }
                         }
@@ -613,34 +626,31 @@ PLUGIN_API VOID OnPulse(VOID) {
             if(Child=pWnd->GetChildItem("CD_TextOutput")) {
                 szTemp[0] = '\0';
                 GetCXStr(((PCSIDLWND)Child)->SidlText,szTemp,sizeof(szTemp));
-                if (strstr(szTemp,"percent")) {
-                    // rez request
-                    //DebugSpew("\agMQ2AutoAccept :: Ignoring rez\ax");
-                    return;
-                } else if (bTranslocate && strstr(szTemp,"translocated to your bind point")) {
+                if (bTranslocate && (strstr(szTemp,"translocated to your bind point") || strstr(szTemp,"wish to be translocated by") )) {
                     // Translocate request
                     WriteChatf("\agMQ2AutoAccept :: Accepting translocate\ax");
                     WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
                     return;
                 } else if (bAnchor && strstr(szTemp,"to the real estate anchor in")) {
+                    // Anchor portal request
                     for ( unsigned int a = 0; a < vAnchors.size (); a++ ) {
                         string& vRef = vAnchors[a];
                         if ( strstr (szTemp, vRef.c_str()) ) {
-                            WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal\ax");
+                            WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal to \ax\at%s\ax", vRef.c_str());
                             WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
                             return;
                         }
                     }
-                    // Anchor portal request
-                } else if (bAnchor && strstr(szTemp, "to your real estate")) {
-                    // Anchor portal request
-                    WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal\ax");
+                } else if ( bSelfAnchor && strstr (szTemp, "transport yourself to the real estate") ) {
+                    // we cast the portal, accept it
+                    WriteChatf("\agMQ2AutoAccept :: Accepting self anchor portal cast\ax");
                     WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
                     return;
                 }
                 //none of the above? do we have any names
                 if (!vNames.size())
                     return;//nope then return
+
                 // All other confirmation boxes
                 for (unsigned int a = 0; a < vNames.size(); a++) {
                     string& vRef = vNames[a];
