@@ -12,6 +12,7 @@
 // v2.12 - Sym - 08-07-2017 - Added wizard translocate and druid zephyr casts to translocate toggle. Previously it was translocate to bind only.
 
 #include "../MQ2Plugin.h"
+using namespace std;
 #include <vector>
 PLUGIN_VERSION(2.12);
 
