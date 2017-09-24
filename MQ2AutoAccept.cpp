@@ -626,7 +626,7 @@ PLUGIN_API VOID OnPulse(VOID) {
         if(pWnd && (BOOL)pWnd->dShow) {
             if(Child=pWnd->GetChildItem("CD_TextOutput")) {
                 szTemp[0] = '\0';
-                GetCXStr(((PCSIDLWND)Child)->SidlText,szTemp,sizeof(szTemp));
+                GetCXStr(((CStmlWnd*)Child)->STMLText,szTemp,sizeof(szTemp));
                 if (bTranslocate && (strstr(szTemp,"translocated to your bind point") || strstr(szTemp,"wish to be translocated by") )) {
                     // Translocate request
                     WriteChatf("\agMQ2AutoAccept :: Accepting translocate\ax");
