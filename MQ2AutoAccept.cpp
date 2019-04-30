@@ -62,7 +62,7 @@ void CombineNames() {
 
 bool WindowOpen(PCHAR WindowName) {
     PCSIDLWND pWnd=(PCSIDLWND)FindMQ2Window(WindowName);
-    return (!pWnd)?false:(BOOL)pWnd->dShow;
+    return (!pWnd)?false:(BOOL)pWnd->IsVisible();
 }
 
 void Update_INIFileName() {
@@ -581,13 +581,13 @@ PLUGIN_API VOID OnPulse(VOID) {
     if (SkipPulse == SKIP_PULSES) {
         SkipPulse = 0;
         // if we've clicked trade no need to check anything, let other person accept or reject
-        if (pTradeWnd && pTradeWnd->dShow && ((PEQTRADEWINDOW)pTradeWnd)->MyTradeReady==0) {
+        if (pTradeWnd && pTradeWnd->IsVisible() && ((PEQTRADEWINDOW)pTradeWnd)->MyTradeReady==0) {
             if (((PEQTRADEWINDOW)pTradeWnd)->HisTradeReady) {
                 if (bTradeAlways) {
                     clickTrade = true;
                 } else {
                     if (CXWnd* pHisNameWnd = pTradeWnd->GetChildItem("TRDW_HisName")) {
-                        GetCXStr(pHisNameWnd->WindowText, szTemp, MAX_STRING - 1);
+                        GetCXStr(pHisNameWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
                         if (szTemp[0] != '\0') {
                             for (unsigned int a = 0; a < vNames.size(); a++) {
                                 string& vRef = vNames[a];
@@ -603,7 +603,7 @@ PLUGIN_API VOID OnPulse(VOID) {
                 for (unsigned int n = 0; n < 8; n++) {
                     sprintf_s(szTemp, "TRDW_TradeSlot%d", n);
                     if (CXWnd* pTRDW_TradeSlotWnd = pTradeWnd->GetChildItem(szTemp)) {
-                        GetCXStr(pTRDW_TradeSlotWnd->Tooltip, szTemp, MAX_STRING - 1);
+                        GetCXStr(pTRDW_TradeSlotWnd->GetTooltip(), szTemp, MAX_STRING - 1);
                         if (szTemp[0] != '\0') {
                             if (strlen(szTemp) > 0) {
                                 //DebugSpew("Giving %s in slot %d",szTemp, n);
@@ -617,7 +617,7 @@ PLUGIN_API VOID OnPulse(VOID) {
                 for (unsigned int n = 0; n < 4; n++) {
                     sprintf_s(szTemp, "TRDW_MyMoney%d", n);
                     if (CXWnd* pTRDW_MyMoneyWnd = pTradeWnd->GetChildItem(szTemp)) {
-                        GetCXStr(pTRDW_MyMoneyWnd->WindowText, szTemp, MAX_STRING - 1);
+                        GetCXStr(pTRDW_MyMoneyWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
                         if (szTemp[0] != '\0' && _stricmp(szTemp,"0")) {
                             if (strlen(szTemp) > 0) {
                                 //DebugSpew("Giving %s in slot %d",szTemp, n);
@@ -633,7 +633,7 @@ PLUGIN_API VOID OnPulse(VOID) {
                 } else {
                     if (clickTrade) {
                         if (CXWnd* pHisNameWnd = pTradeWnd->GetChildItem("TRDW_HisName")) {
-                            GetCXStr(pHisNameWnd->WindowText, szTemp, MAX_STRING - 1);
+                            GetCXStr(pHisNameWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
                             if (szTemp[0] != '\0') {
                                 if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
                                     WriteChatf("\agMQ2AutoAccept :: Accepting trade from %s\ax", szTemp);
@@ -659,7 +659,7 @@ PLUGIN_API VOID OnPulse(VOID) {
             }
         }
         pWnd=(CXWnd *)FindMQ2Window("ConfirmationDialogBox");
-        if(pWnd && (BOOL)pWnd->dShow) {
+        if(pWnd && (BOOL)pWnd->IsVisible()) {
             if(Child=pWnd->GetChildItem("CD_TextOutput")) {
                 szTemp[0] = '\0';
                 GetCXStr(((CStmlWnd*)Child)->STMLText,szTemp,sizeof(szTemp));
