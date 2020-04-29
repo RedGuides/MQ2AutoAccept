@@ -13,26 +13,17 @@
 // v2.13 - Eqmule - 06-04-2018 - Fixed a null ptr crash and added a check for a rez message so it wont accept that, its not this plugins job to accept rezzes.
 #include "../MQ2Plugin.h"
 
-using namespace std;
-#include <vector>
+PreSetup("MQ2AutoAccept");
 PLUGIN_VERSION(2.13);
 
-#pragma warning(disable:4800)
-PreSetup("MQ2AutoAccept");
+std::vector <std::string> vIniNames;
+std::vector <std::string> vGlobalNames;
+std::vector <std::string> vNames;
+std::vector <std::string> vAnchors;
 
-vector <string> vIniNames;
-vector <string> vGlobalNames;
-vector <string> vNames;
-vector <string> vAnchors;
-#define SKIP_PULSES 40
+constexpr int MAX_TRADE_COIN_SLOTS = 4;
 
-long SkipPulse = 0;
-
-char szTemp[MAX_STRING];
-char szName[MAX_STRING];
-char szName2[MAX_STRING];
 char szList[MAX_STRING];
-char szAnchors[MAX_STRING];
 bool bAutoAccept = false;
 bool bTranslocate = false;
 bool bAnchor = false;
@@ -50,30 +41,25 @@ ULONGLONG rejectTimer = 0;
 
 void CombineNames() {
     vNames.clear();
-    for (register unsigned int a = 0; a < vGlobalNames.size(); a++) {
-        string& vRef = vGlobalNames[a];
-        vNames.push_back(vRef.c_str());
+    for (auto& vRef : vGlobalNames)
+    {
+        vNames.emplace_back(vRef);
     }
-    for (register unsigned int a = 0; a < vIniNames.size(); a++) {
-        string& vRef = vIniNames[a];
-        vNames.push_back(vRef.c_str());
+    for (auto& vRef : vIniNames)
+    {
+        vNames.emplace_back(vRef);
     }
 }
 
 bool WindowOpen(PCHAR WindowName) {
-    PCSIDLWND pWnd=(PCSIDLWND)FindMQ2Window(WindowName);
-    return (!pWnd)?false:(BOOL)pWnd->IsVisible();
-}
-
-void Update_INIFileName() {
-    //sprintf_s(INIFileName,"%s\\%s_%s.ini",gszINIPath, EQADDR_SERVERNAME, GetCharInfo()->Name);
-    sprintf_s(INIFileName,"%s\\MQ2AutoAccept.ini",gszINIPath);
+    const auto pWnd = (PCSIDLWND)FindMQ2Window(WindowName);
+    return pWnd && pWnd->IsVisible();
 }
 
 void ListUsers() {
     WriteChatf("User list contains \ay%d\ax %s", vNames.size(), vNames.size() > 1 ? "entries" : "entry");
     for (unsigned int a = 0; a < vNames.size(); a++) {
-        string& vRef = vNames[a];
+        std::string& vRef = vNames[a];
         WriteChatf("\at%d: %s\ax", a+1, vRef.c_str());
     }
 }
@@ -81,14 +67,14 @@ void ListUsers() {
 void ListAnchors() {
     WriteChatf("Anchor list contains \ay%d\ax %s", vAnchors.size(), vAnchors.size() > 1 ? "entries" : "entry");
     for (unsigned int a = 0; a < vAnchors.size(); a++) {
-        string& vRef = vAnchors[a];
+        std::string& vRef = vAnchors[a];
         WriteChatf("\at%d: %s\ax", a+1, vRef.c_str());
     }
 }
 
-VOID SaveINI(VOID)
+void SaveINI()
 {
-    Update_INIFileName();
+    char szTemp[MAX_STRING] = { 0 };
     // write on/off settings
     sprintf_s(szTemp,"%s_Settings",GetCharInfo()->Name);
     WritePrivateProfileSection(szTemp, "", INIFileName);
@@ -107,9 +93,9 @@ VOID SaveINI(VOID)
     // write all names
     sprintf_s(szTemp,"%s_Names",GetCharInfo()->Name);
     WritePrivateProfileSection(szTemp, "", INIFileName);
-    for (unsigned int a = 0; a < vIniNames.size(); a++) {
-        string& vRef = vIniNames[a];
-        WritePrivateProfileString(szTemp,vRef.c_str(),"1",INIFileName);
+    for (auto& vRef : vIniNames)
+    {
+        WritePrivateProfileString(szTemp, vRef.c_str(), "1", INIFileName);
     }
 
     char szA[MAX_STRING];
@@ -117,20 +103,21 @@ VOID SaveINI(VOID)
     sprintf_s(szTemp,"%s_Anchors",GetCharInfo()->Name);
     WritePrivateProfileSection(szTemp, "", INIFileName);
     for (unsigned int a = 0; a < vAnchors.size(); a++) {
-        string& vRef = vAnchors[a];
+        std::string& vRef = vAnchors[a];
         sprintf_s(szA,"Anchor%d",a);
         WritePrivateProfileString(szTemp,szA,vRef.c_str(),INIFileName);
     }
     WriteChatf("MQ2AutoAccept :: Settings updated");
 }
 
-VOID LoadINI(VOID)
+void LoadINI()
 {
-    Update_INIFileName();
     // get on/off settings
-	PCHARINFO pChar = GetCharInfo();
-	if (!pChar)
-		return;
+    PCHARINFO pChar = GetCharInfo();
+    if (!pChar)
+        return;
+
+    char szTemp[MAX_STRING] = { 0 };
     sprintf_s(szTemp,"%s_Settings",pChar->Name);
     bAutoAccept = GetPrivateProfileInt(szTemp, "Enabled", 1, INIFileName) > 0 ? true : false;
     bTranslocate = GetPrivateProfileInt(szTemp, "Translocate", 0, INIFileName) > 0 ? true : false;
@@ -150,6 +137,7 @@ VOID LoadINI(VOID)
     // clear list
     vIniNames.clear();
 
+    // TODO: Rather than duplicate the below code multiple times, abstract to function
     char* p = (char*)szList;
     char *pch = 0;
     char *Next_Token1 = 0;
@@ -164,16 +152,16 @@ VOID LoadINI(VOID)
         length = strlen(p);
         // split entries on =
         pch = strtok_s(p,"=",&Next_Token1);
-        while (pch != NULL)
+        while (pch != nullptr)
         {
             // Odd entries are the names. Add it to the list
             vIniNames.push_back(pch);
 
             // next is value. Don't use it so skip it
-            pch = strtok_s(NULL, "=",&Next_Token1);
+            pch = strtok_s(nullptr, "=", &Next_Token1);
 
             // next name
-            pch = strtok_s(NULL, "=",&Next_Token1);
+            pch = strtok_s(nullptr, "=", &Next_Token1);
             i++;
         }
         p += length;
@@ -184,7 +172,6 @@ VOID LoadINI(VOID)
     vGlobalNames.clear();
 
     p = (char*)szList;
-    length = 0;
     i = 0;
     // loop through all entries under _Names
     // values are terminated by \0, final value is teminated with \0\0
@@ -195,16 +182,16 @@ VOID LoadINI(VOID)
         length = strlen(p);
         // split entries on =
         pch = strtok_s(p,"=",&Next_Token1);
-        while (pch != NULL)
+        while (pch != nullptr)
         {
             // Odd entries are the names. Add it to the list
             vGlobalNames.push_back(pch);
 
             // next is value. Don't use it so skip it
-            pch = strtok_s(NULL, "=",&Next_Token1);
+            pch = strtok_s(nullptr, "=",&Next_Token1);
 
             // next name
-            pch = strtok_s(NULL, "=",&Next_Token1);
+            pch = strtok_s(nullptr, "=",&Next_Token1);
             i++;
         }
         p += length;
@@ -223,7 +210,6 @@ VOID LoadINI(VOID)
     vAnchors.clear();
 
     p = (char*)szList;
-    length = 0;
     i = 0;
     // loop through all entries under _Names
     // values are terminated by \0, final value is teminated with \0\0
@@ -234,24 +220,24 @@ VOID LoadINI(VOID)
         length = strlen(p);
         // split entries on =
         pch = strtok_s(p,"=",&Next_Token1);
-        while (pch != NULL)
+        while (pch != nullptr)
         {
             // Odd values are the numbered entries. Don't use it so skip it
-            pch = strtok_s(NULL, "=",&Next_Token1);
+            pch = strtok_s(nullptr, "=",&Next_Token1);
 
             // Even entries are the anchor values. Add it to the list
             if(pch)
-				vAnchors.push_back(pch);
+                vAnchors.push_back(pch);
 
             // next anchor
-            pch = strtok_s(NULL, "=",&Next_Token1);
+            pch = strtok_s(nullptr, "=",&Next_Token1);
             i++;
         }
         p += length;
         p++;
     }
-    if (vAnchors.size())
-		ListAnchors();
+    if (!vAnchors.empty())
+        ListAnchors();
     // flag first load init as done
 
     bInitDone = true;
@@ -260,14 +246,14 @@ VOID LoadINI(VOID)
 PLUGIN_API VOID SetGameState(DWORD GameState) {
     if(GameState==GAMESTATE_INGAME) {
         if (!bInitDone)
-			LoadINI();
+            LoadINI();
     } else if(GameState!=GAMESTATE_LOGGINGIN) {
         if (bInitDone)
-			bInitDone=false;
+            bInitDone=false;
     }
 }
 
-void ShowHelp(void) {
+void ShowHelp() {
     WriteChatf("\atMQ2AutoAccept :: v%1.2f :: by Sym for RedGuides.com\ax", MQ2Version);
     WriteChatf("/autoaccept :: Lists command syntax");
     WriteChatf("/autoaccept on|off :: Main accept toggle. Nothing else will accept if this is off. Default \ag*ON*\ax");
@@ -291,7 +277,7 @@ void ShowHelp(void) {
 }
 
 void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
-    int b = 0;
+    char szTemp[MAX_STRING] = { 0 };
     GetArg(szTemp,zLine,1);
 
     if(!_strnicmp(szTemp,"load",4)) {
@@ -336,7 +322,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
             return;
         }
         for (unsigned int a = 0; a < vAnchors.size(); a++) {
-            string& vRef = vAnchors[a];
+            std::string& vRef = vAnchors[a];
             if (!_strcmpi(szTemp,vRef.c_str())) {
                 WriteChatf("MQ2AutoAccept :: Anchor \ay%s\ax already exists", szTemp);
                 return;
@@ -352,7 +338,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
             return;
         }
         for (unsigned int a = 0; a < vIniNames.size(); a++) {
-            string& vRef = vIniNames[a];
+            std::string& vRef = vIniNames[a];
             if (!_strcmpi(szTemp,vRef.c_str())) {
                 WriteChatf("MQ2AutoAccept :: User \ay%s\ax already exists", szTemp);
                 return;
@@ -366,7 +352,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
         int delIndex = -1;
         GetArg(szTemp,zLine,2);
         for (unsigned int a = 0; a < vAnchors.size(); a++) {
-            string& vRef = vAnchors[a];
+            std::string& vRef = vAnchors[a];
             if (!_strcmpi(szTemp,vRef.c_str())) {
                 delIndex = a;
             }
@@ -382,7 +368,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
         int delIndex = -1;
         GetArg(szTemp,zLine,2);
         for (unsigned int a = 0; a < vIniNames.size(); a++) {
-            string& vRef = vIniNames[a];
+            std::string& vRef = vIniNames[a];
             if (!_strcmpi(szTemp,vRef.c_str())) {
                 delIndex = a;
             }
@@ -422,10 +408,10 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
         }
         WriteChatf("MQ2AutoAccept :: Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
     }
-	else if(!_strnicmp(szTemp,"fellowship",10)) {
+    else if(!_strnicmp(szTemp,"fellowship",10)) {
         GetArg(szTemp,zLine,2);
         if(!_strnicmp(szTemp,"on",2)) {
-            bFellowship = true;         
+            bFellowship = true;
         } else if(!_strnicmp(szTemp,"off",3)) {
             bFellowship = false;
         }
@@ -511,18 +497,20 @@ PLUGIN_API VOID ShutdownPlugin() {
 PLUGIN_API DWORD OnIncomingChat(PCHAR Line, DWORD Color)
 {
     // No users, abort
-    if (!vNames.size())
-		return 0;
-	PCHARINFO pChar = GetCharInfo();
-	if (!pChar)
-		return 0;
-    CHAR szName[MAX_STRING];
+    if (vNames.empty())
+        return 0;
+
+    PCHARINFO pChar = GetCharInfo();
+    if (!pChar)
+        return 0;
+
+    char szName[MAX_STRING] = { 0 };
     if (strstr(Line,"invites you to join a group.") && bGroup) {
         GetArg(szName,Line,1);
         // loop through user list and find a match for inviter. If found join group
-        for (unsigned int a = 0; a < vNames.size(); a++) {
-            string& vRef = vNames[a];
-            if (!_strcmpi(szName,vRef.c_str())) {
+        for (auto& vRef : vNames)
+        {
+            if (!_strcmpi(szName, vRef.c_str())) {
                 DoCommand(pChar->pSpawn,"/timed 3s /invite");
                 WriteChatf("\agMQ2AutoAccept :: Joining group with %s\ax",szName);
             }
@@ -530,20 +518,20 @@ PLUGIN_API DWORD OnIncomingChat(PCHAR Line, DWORD Color)
     } else if (strstr(Line,"invites you to join a fellowship.") && bFellowship) {
         GetArg(szName,Line,1);
         // loop through user list and find a match for inviter. If found join group
-        for (unsigned int a = 0; a < vNames.size(); a++) {
-            string& vRef = vNames[a];
-            if (!_strcmpi(szName,vRef.c_str())) {
+        for (auto& vRef : vNames)
+        {
+            if (!_strcmpi(szName, vRef.c_str())) {
                 DoCommand(pChar->pSpawn,"/timed 3s /invite");
-                WriteChatf("\agMQ2AutoAccept :: Joining fellowship with %s\ax",szName);  
+                WriteChatf("\agMQ2AutoAccept :: Joining fellowship with %s\ax",szName);
             }
         }
     }
     else if (strstr(Line,"invites you to join a raid") && bRaid) {
         GetArg(szName,Line,1);
         // loop through user list and find a match for inviter. If found join raid
-        for (unsigned int a = 0; a < vNames.size(); a++) {
-            string& vRef = vNames[a];
-            if (!_strcmpi(szName,vRef.c_str())) {
+        for (auto& vRef : vNames)
+        {
+            if (!_strcmpi(szName, vRef.c_str())) {
                 DoCommand(pChar->pSpawn,"/timed 3s /raidaccept");
                 WriteChatf("\agMQ2AutoAccept :: Joining raid with %s\ax",szName);
             }
@@ -555,149 +543,155 @@ PLUGIN_API DWORD OnIncomingChat(PCHAR Line, DWORD Color)
 void WinClick(CXWnd *Wnd, PCHAR ScreenID, PCHAR ClickNotification, DWORD KeyState) {
     if (Wnd && pWndMgr) {
         if (CXWnd *Child = Wnd->GetChildItem(ScreenID)) {
-            BOOL KeyboardFlags[4];
-            *(DWORD*)&KeyboardFlags = *(DWORD*)&((PCXWNDMGR)pWndMgr)->KeyboardFlags;
-            *(DWORD*)&((PCXWNDMGR)pWndMgr)->KeyboardFlags = KeyState;
+            bool KeyboardFlags[4];
+            *reinterpret_cast<DWORD*>(&KeyboardFlags) = *reinterpret_cast<DWORD*>(&reinterpret_cast<PCXWNDMGR>(pWndMgr)->KeyboardFlags);
+            *reinterpret_cast<DWORD*>(&reinterpret_cast<PCXWNDMGR>(pWndMgr)->KeyboardFlags) = KeyState;
             SendWndClick2(Child, ClickNotification);
-            *(DWORD*)&((PCXWNDMGR)pWndMgr)->KeyboardFlags = *(DWORD*)&KeyboardFlags;
+            *reinterpret_cast<DWORD*>(&reinterpret_cast<PCXWNDMGR>(pWndMgr)->KeyboardFlags) = *reinterpret_cast<DWORD*>(&KeyboardFlags);
         }
     }
 }
 
 // This is called every time MQ pulses
-PLUGIN_API VOID OnPulse(VOID) {
+PLUGIN_API VOID OnPulse()
+{
+    static int Pulse = 0;
+
     if (GetGameState() != GAMESTATE_INGAME)
         return;
+
     if (!bInitDone)
         return;
+
     if (!bAutoAccept)
         return;
 
-    CXWnd *Child;
-    CXWnd *pWnd;
+    // Process every 40 pulses
+    if (++Pulse < 40)
+        return;
+
+    Pulse = 0;
+
     bool clickTrade = false;
     bool givingItem = false;
+    char szTemp[MAX_STRING] = { 0 };
 
-    if (SkipPulse == SKIP_PULSES) {
-        SkipPulse = 0;
-        // if we've clicked trade no need to check anything, let other person accept or reject
-        if (pTradeWnd && pTradeWnd->IsVisible() && ((PEQTRADEWINDOW)pTradeWnd)->MyTradeReady==0) {
-            if (((PEQTRADEWINDOW)pTradeWnd)->HisTradeReady) {
-                if (bTradeAlways) {
-                    clickTrade = true;
-                } else {
+    // if we've clicked trade no need to check anything, let other person accept or reject
+    if (pTradeWnd && pTradeWnd->IsVisible() && ((PEQTRADEWINDOW)pTradeWnd)->MyTradeReady==0) {
+        if (((PEQTRADEWINDOW)pTradeWnd)->HisTradeReady) {
+            if (bTradeAlways) {
+                clickTrade = true;
+            } else {
+                if (CXWnd* pHisNameWnd = pTradeWnd->GetChildItem("TRDW_HisName")) {
+                    GetCXStr(pHisNameWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
+                    if (szTemp[0] != '\0') {
+                        for (auto& vRef : vNames)
+                        {
+                            if (!_strcmpi(szTemp, vRef.c_str())) {
+                                clickTrade = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            // Check only the first half of the trade slots (ours)
+            // TODO: MAX_TRADE_SLOTS should be in core and this is MAX_TRADE_SLOTS / 2
+            for (int n = 0; n < 8; ++n) {
+                sprintf_s(szTemp, "TRDW_TradeSlot%d", n);
+                if (CXWnd* pTRDW_TradeSlotWnd = pTradeWnd->GetChildItem(szTemp)) {
+                    GetCXStr(pTRDW_TradeSlotWnd->GetTooltip(), szTemp, MAX_STRING - 1);
+                    if (szTemp[0] != '\0') {
+                        //DebugSpew("Giving %s in slot %d",szTemp, n);
+                        givingItem = true;
+                        break;
+                    }
+                }
+            }
+            bool givingMoney = false;
+            for (int n = 0; n < MAX_TRADE_COIN_SLOTS; ++n) {
+                sprintf_s(szTemp, "TRDW_MyMoney%d", n);
+                if (CXWnd* pTRDW_MyMoneyWnd = pTradeWnd->GetChildItem(szTemp)) {
+                    GetCXStr(pTRDW_MyMoneyWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
+                    if (szTemp[0] != '\0' && strcmp(szTemp, "0") != 0) {
+                        //DebugSpew("Giving %s in slot %d",szTemp, n);
+                        givingMoney = true;
+                        break;
+                    }
+                }
+            }
+            if (  givingItem || givingMoney) {
+                // We're giving item or coin, don't auto do anything
+                //DebugSpew("We're giving item or coin, don't do anything");
+            } else {
+                if (clickTrade) {
                     if (CXWnd* pHisNameWnd = pTradeWnd->GetChildItem("TRDW_HisName")) {
                         GetCXStr(pHisNameWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
                         if (szTemp[0] != '\0') {
-                            for (unsigned int a = 0; a < vNames.size(); a++) {
-                                string& vRef = vNames[a];
-                                if (!_strcmpi(szTemp, vRef.c_str())) {
-                                    clickTrade = true;
-                                    break;
-                                }
+                            if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
+                                WriteChatf("\agMQ2AutoAccept :: Accepting trade from %s\ax", szTemp);
+                                SendWndClick2(pTRDW_Trade_Button,"leftmouseup");
+                                pTarget = nullptr;
                             }
                         }
                     }
-                }
-                givingItem = false;
-                for (unsigned int n = 0; n < 8; n++) {
-                    sprintf_s(szTemp, "TRDW_TradeSlot%d", n);
-                    if (CXWnd* pTRDW_TradeSlotWnd = pTradeWnd->GetChildItem(szTemp)) {
-                        GetCXStr(pTRDW_TradeSlotWnd->GetTooltip(), szTemp, MAX_STRING - 1);
-                        if (szTemp[0] != '\0') {
-                            if (strlen(szTemp) > 0) {
-                                //DebugSpew("Giving %s in slot %d",szTemp, n);
-                                givingItem = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                bool givingMoney = false;
-                for (unsigned int n = 0; n < 4; n++) {
-                    sprintf_s(szTemp, "TRDW_MyMoney%d", n);
-                    if (CXWnd* pTRDW_MyMoneyWnd = pTradeWnd->GetChildItem(szTemp)) {
-                        GetCXStr(pTRDW_MyMoneyWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
-                        if (szTemp[0] != '\0' && _stricmp(szTemp,"0")) {
-                            if (strlen(szTemp) > 0) {
-                                //DebugSpew("Giving %s in slot %d",szTemp, n);
-                                givingMoney = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (  givingItem || givingMoney) {
-                    // We're giving item or coin, don't auto do anything
-                    //DebugSpew("We're giving item or coin, don't do anything");
                 } else {
-                    if (clickTrade) {
-                        if (CXWnd* pHisNameWnd = pTradeWnd->GetChildItem("TRDW_HisName")) {
-                            GetCXStr(pHisNameWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
-                            if (szTemp[0] != '\0') {
-                                if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
-                                    WriteChatf("\agMQ2AutoAccept :: Accepting trade from %s\ax", szTemp);
-                                    SendWndClick2(pTRDW_Trade_Button,"leftmouseup");
-                                    pTarget = NULL;
-                                }
-                            }
-                        }
-                    } else {
-                        if (bTradeReject) {
-                            if (rejectTimer == 0)
-                                rejectTimer = GetTickCount642() + 5000;
-                            if (rejectTimer < GetTickCount642()) {
-                                rejectTimer = 0;
-                                if (CXWnd* pTRDW_Cancel_Button = pTradeWnd->GetChildItem("TRDW_Cancel_Button")) {
-                                    WriteChatf("\arMQ2AutoAccept :: Canceling Trade\ax");
-                                    SendWndClick2(pTRDW_Cancel_Button,"leftmouseup");
-                                }
+                    if (bTradeReject) {
+                        if (rejectTimer == 0)
+                            rejectTimer = GetTickCount64() + 5000;
+                        if (rejectTimer < GetTickCount64()) {
+                            rejectTimer = 0;
+                            if (CXWnd* pTRDW_Cancel_Button = pTradeWnd->GetChildItem("TRDW_Cancel_Button")) {
+                                WriteChatf("\arMQ2AutoAccept :: Canceling Trade\ax");
+                                SendWndClick2(pTRDW_Cancel_Button,"leftmouseup");
                             }
                         }
                     }
                 }
             }
         }
-        pWnd=(CXWnd *)FindMQ2Window("ConfirmationDialogBox");
-        if(pWnd && (BOOL)pWnd->IsVisible()) {
-            if(Child=pWnd->GetChildItem("CD_TextOutput")) {
-                szTemp[0] = '\0';
-                GetCXStr(((CStmlWnd*)Child)->STMLText,szTemp,sizeof(szTemp));
-                 if (strstr(szTemp,"percent")) {
-					// rez request
-                    //DebugSpew("\agMQ2AutoAccept :: Ignoring rez\ax");
-                    return;
-                } else if (bTranslocate && (strstr(szTemp,"translocated to your bind point") || strstr(szTemp,"wish to be translocated by") )) {
-                    // Translocate request
-                    WriteChatf("\agMQ2AutoAccept :: Accepting translocate\ax");
-                    WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
-                    return;
-                } else if (bAnchor && strstr(szTemp,"to the real estate anchor in")) {
-                    // Anchor portal request
-                    for ( unsigned int a = 0; a < vAnchors.size (); a++ ) {
-                        string& vRef = vAnchors[a];
-                        if ( strstr (szTemp, vRef.c_str()) ) {
-                            WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal to \ax\at%s\ax", vRef.c_str());
-                            WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
-                            return;
-                        }
-                    }
-                } else if ( bSelfAnchor && strstr (szTemp, "transport yourself to the real estate") ) {
-                    // we cast the portal, accept it
-                    WriteChatf("\agMQ2AutoAccept :: Accepting self anchor portal cast\ax");
-                    WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
-                    return;
-                }
-                //none of the above? do we have any names
-                if (!vNames.size())
-                    return;//nope then return
+    }
 
+    CXWnd* pWnd=(CXWnd *)FindMQ2Window("ConfirmationDialogBox");
+    if(pWnd && pWnd->IsVisible()) {
+        if(CXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
+            szTemp[0] = '\0';
+            GetCXStr(((CStmlWnd*)Child)->STMLText,szTemp,sizeof(szTemp));
+
+            if (strstr(szTemp,"percent")) {
+                // rez request
+                //DebugSpew("\agMQ2AutoAccept :: Ignoring rez\ax");
+            }
+            else if (bTranslocate && (strstr(szTemp, "translocated to your bind point") || strstr(szTemp, "wish to be translocated by") )) {
+                // Translocate request
+                WriteChatf("\agMQ2AutoAccept :: Accepting translocate\ax");
+                WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
+            }
+            else if (bAnchor && strstr(szTemp, "to the real estate anchor in")) {
+                // Anchor portal request
+                for (auto& vRef : vAnchors)
+                {
+                    if (strstr(szTemp, vRef.c_str())) {
+                        WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal to \ax\at%s\ax", vRef.c_str());
+                        WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
+                    }
+                }
+            }
+            else if (bSelfAnchor && strstr(szTemp, "transport yourself to the real estate")) {
+                // we cast the portal, accept it
+                WriteChatf("\agMQ2AutoAccept :: Accepting self anchor portal cast\ax");
+                WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+            }
+            //none of the above? do we have any names
+            else if (!vNames.empty()) {
                 // All other confirmation boxes
-                for (unsigned int a = 0; a < vNames.size(); a++) {
-                    string& vRef = vNames[a];
+                for (auto& vRef : vNames)
+                {
+                    char szName[MAX_STRING] = { 0 };
+                    char szName2[MAX_STRING] = { 0 };
                     sprintf_s(szName,"%s ", vRef.c_str());
                     sprintf_s(szName2,"%s's", vRef.c_str());
-                    if(strstr(szTemp,szName) || strstr(szTemp,szName2)) {
+                    if(strstr(szTemp, szName) || strstr(szTemp, szName2)) {
                         if (pWnd->GetChildItem("Yes_Button")) {
                             WriteChatf("\agMQ2AutoAccept :: Clicking Yes\ax");
                             WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
@@ -712,6 +706,4 @@ PLUGIN_API VOID OnPulse(VOID) {
             }
         }
     }
-
-   SkipPulse++;
 }
