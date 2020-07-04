@@ -11,7 +11,7 @@
 //    /autoaccept selfanchor on|off :: Toggle acceptance of primary/secondary real estate anchor port when you cast it.  Default *OFF*
 // v2.12 - Sym - 08-07-2017 - Added wizard translocate and druid zephyr casts to translocate toggle. Previously it was translocate to bind only.
 // v2.13 - Eqmule - 06-04-2018 - Fixed a null ptr crash and added a check for a rez message so it wont accept that, its not this plugins job to accept rezzes.
-#include "../MQ2Plugin.h"
+#include <mq/Plugin.h>
 
 PreSetup("MQ2AutoAccept");
 PLUGIN_VERSION(2.13);
@@ -52,7 +52,7 @@ void CombineNames() {
 }
 
 bool WindowOpen(PCHAR WindowName) {
-    const auto pWnd = (PCSIDLWND)FindMQ2Window(WindowName);
+    const auto pWnd = dynamic_cast<CSidlScreenWnd*>(FindMQ2Window(WindowName));
     return pWnd && pWnd->IsVisible();
 }
 
@@ -95,7 +95,7 @@ void SaveINI()
     WritePrivateProfileSection(szTemp, "", INIFileName);
     for (auto& vRef : vIniNames)
     {
-        WritePrivateProfileString(szTemp, vRef.c_str(), "1", INIFileName);
+        WritePrivateProfileString(szTemp, vRef, "1", INIFileName);
     }
 
     char szA[MAX_STRING];
@@ -119,16 +119,16 @@ void LoadINI()
 
     char szTemp[MAX_STRING] = { 0 };
     sprintf_s(szTemp,"%s_Settings",pChar->Name);
-    bAutoAccept = GetPrivateProfileInt(szTemp, "Enabled", 1, INIFileName) > 0 ? true : false;
-    bTranslocate = GetPrivateProfileInt(szTemp, "Translocate", 0, INIFileName) > 0 ? true : false;
-    bAnchor = GetPrivateProfileInt(szTemp, "Anchor", 0, INIFileName) > 0 ? true : false;
-    bSelfAnchor = GetPrivateProfileInt(szTemp, "SelfAnchor", 0, INIFileName) > 0 ? true : false;
-    bTrade = GetPrivateProfileInt(szTemp, "Trade", 1, INIFileName) > 0 ? true : false;
-    bTradeAlways = GetPrivateProfileInt(szTemp, "TradeAlways", 0, INIFileName) > 0 ? true : false;
-    bTradeReject = GetPrivateProfileInt(szTemp, "TradeReject", 0, INIFileName) > 0 ? true : false;
-    bGroup = GetPrivateProfileInt(szTemp, "Group", 1, INIFileName) > 0 ? true : false;
-    bFellowship = GetPrivateProfileInt(szTemp, "Fellowship", 1, INIFileName) > 0 ? true : false;
-    bRaid = GetPrivateProfileInt(szTemp, "Raid", 1, INIFileName) > 0 ? true : false;
+    bAutoAccept = GetPrivateProfileBool(szTemp, "Enabled", true, INIFileName);
+    bTranslocate = GetPrivateProfileBool(szTemp, "Translocate", false, INIFileName);
+    bAnchor = GetPrivateProfileBool(szTemp, "Anchor", false, INIFileName);
+    bSelfAnchor = GetPrivateProfileBool(szTemp, "SelfAnchor", false, INIFileName);
+    bTrade = GetPrivateProfileBool(szTemp, "Trade", true, INIFileName);
+    bTradeAlways = GetPrivateProfileBool(szTemp, "TradeAlways", false, INIFileName);
+    bTradeReject = GetPrivateProfileBool(szTemp, "TradeReject", false, INIFileName);
+    bGroup = GetPrivateProfileBool(szTemp, "Group", true, INIFileName);
+    bFellowship = GetPrivateProfileBool(szTemp, "Fellowship", true, INIFileName);
+    bRaid = GetPrivateProfileBool(szTemp, "Raid", true, INIFileName);
 
     // get all names
     sprintf_s(szTemp,"%s_Names",pChar->Name);
@@ -243,7 +243,7 @@ void LoadINI()
     bInitDone = true;
 }
 
-PLUGIN_API VOID SetGameState(DWORD GameState) {
+PLUGIN_API void SetGameState(int GameState) {
     if(GameState==GAMESTATE_INGAME) {
         if (!bInitDone)
             LoadINI();
@@ -482,19 +482,20 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 
 
 // Called once, when the plugin is to initialize
-PLUGIN_API VOID InitializePlugin() {
+PLUGIN_API void InitializePlugin() {
     DebugSpewAlways("Initializing MQ2AutoAccept");
     AddCommand("/autoaccept",AutoAcceptCommand);
     ShowHelp();
 }
 
 // Called once, when the plugin is to shutdown
-PLUGIN_API VOID ShutdownPlugin() {
+PLUGIN_API void ShutdownPlugin() {
     DebugSpewAlways("Shutting down MQ2AutoAccept");
     RemoveCommand("/autoaccept");
 }
 
-PLUGIN_API DWORD OnIncomingChat(PCHAR Line, DWORD Color)
+// TODO: This signature should be const char* but need to fix use of GetArg below.
+PLUGIN_API bool OnIncomingChat(PCHAR Line, DWORD Color)
 {
     // No users, abort
     if (vNames.empty())
@@ -544,16 +545,16 @@ void WinClick(CXWnd *Wnd, PCHAR ScreenID, PCHAR ClickNotification, DWORD KeyStat
     if (Wnd && pWndMgr) {
         if (CXWnd *Child = Wnd->GetChildItem(ScreenID)) {
             bool KeyboardFlags[4];
-            *reinterpret_cast<DWORD*>(&KeyboardFlags) = *reinterpret_cast<DWORD*>(&reinterpret_cast<PCXWNDMGR>(pWndMgr)->KeyboardFlags);
-            *reinterpret_cast<DWORD*>(&reinterpret_cast<PCXWNDMGR>(pWndMgr)->KeyboardFlags) = KeyState;
+            *reinterpret_cast<DWORD*>(&KeyboardFlags) = *reinterpret_cast<DWORD*>(&pWndMgr->KeyboardFlags);
+            *reinterpret_cast<DWORD*>(&pWndMgr->KeyboardFlags) = KeyState;
             SendWndClick2(Child, ClickNotification);
-            *reinterpret_cast<DWORD*>(&reinterpret_cast<PCXWNDMGR>(pWndMgr)->KeyboardFlags) = *reinterpret_cast<DWORD*>(&KeyboardFlags);
+            *reinterpret_cast<DWORD*>(&pWndMgr->KeyboardFlags) = *reinterpret_cast<DWORD*>(&KeyboardFlags);
         }
     }
 }
 
 // This is called every time MQ pulses
-PLUGIN_API VOID OnPulse()
+PLUGIN_API void OnPulse()
 {
     static int Pulse = 0;
 
@@ -574,34 +575,30 @@ PLUGIN_API VOID OnPulse()
 
     bool clickTrade = false;
     bool givingItem = false;
-    char szTemp[MAX_STRING] = { 0 };
 
     // if we've clicked trade no need to check anything, let other person accept or reject
-    if (pTradeWnd && pTradeWnd->IsVisible() && ((PEQTRADEWINDOW)pTradeWnd)->MyTradeReady==0) {
-        if (((PEQTRADEWINDOW)pTradeWnd)->HisTradeReady) {
+    if (pTradeWnd && pTradeWnd->IsVisible() && !pTradeWnd->bMyReadyTrade) {
+        if (pTradeWnd->bHisReadyTrade) {
+            const CXStr theirName = pTradeWnd->HisNameLabel->Text;
             if (bTradeAlways) {
                 clickTrade = true;
             } else {
-                if (CXWnd* pHisNameWnd = pTradeWnd->GetChildItem("TRDW_HisName")) {
-                    GetCXStr(pHisNameWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
-                    if (szTemp[0] != '\0') {
-                        for (auto& vRef : vNames)
-                        {
-                            if (!_strcmpi(szTemp, vRef.c_str())) {
-                                clickTrade = true;
-                                break;
-                            }
+                if (!theirName.empty()) {
+                    for (auto& vRef : vNames)
+                    {
+                        if (ci_equals(theirName, vRef)) {
+                            clickTrade = true;
+                            break;
                         }
                     }
                 }
             }
             // Check only the first half of the trade slots (ours)
-            // TODO: MAX_TRADE_SLOTS should be in core and this is MAX_TRADE_SLOTS / 2
-            for (int n = 0; n < 8; ++n) {
-                sprintf_s(szTemp, "TRDW_TradeSlot%d", n);
-                if (CXWnd* pTRDW_TradeSlotWnd = pTradeWnd->GetChildItem(szTemp)) {
-                    GetCXStr(pTRDW_TradeSlotWnd->GetTooltip(), szTemp, MAX_STRING - 1);
-                    if (szTemp[0] != '\0') {
+            for (int n = 0; n < MAX_TRADE_SLOTS / 2; ++n) {
+                std::string strSlotName = "TRDW_TradeSlot" + std::to_string(n);
+                if (CXWnd* pTRDW_TradeSlotWnd = pTradeWnd->GetChildItem(&strSlotName[0])) {
+                    const auto toolTip = pTRDW_TradeSlotWnd->GetTooltip();
+                    if (!toolTip.empty()) {
                         //DebugSpew("Giving %s in slot %d",szTemp, n);
                         givingItem = true;
                         break;
@@ -610,10 +607,10 @@ PLUGIN_API VOID OnPulse()
             }
             bool givingMoney = false;
             for (int n = 0; n < MAX_TRADE_COIN_SLOTS; ++n) {
-                sprintf_s(szTemp, "TRDW_MyMoney%d", n);
-                if (CXWnd* pTRDW_MyMoneyWnd = pTradeWnd->GetChildItem(szTemp)) {
-                    GetCXStr(pTRDW_MyMoneyWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
-                    if (szTemp[0] != '\0' && strcmp(szTemp, "0") != 0) {
+                std::string strSlotName = "TRDW_MyMoney" + std::to_string(n);
+                if (CXWnd* pTRDW_MyMoneyWnd = pTradeWnd->GetChildItem(&strSlotName[0])) {
+                    const auto windowText = pTRDW_MyMoneyWnd->GetWindowText();
+                    if (!windowText.empty() && GetIntFromString(windowText, 0) > 0) {
                         //DebugSpew("Giving %s in slot %d",szTemp, n);
                         givingMoney = true;
                         break;
@@ -625,14 +622,11 @@ PLUGIN_API VOID OnPulse()
                 //DebugSpew("We're giving item or coin, don't do anything");
             } else {
                 if (clickTrade) {
-                    if (CXWnd* pHisNameWnd = pTradeWnd->GetChildItem("TRDW_HisName")) {
-                        GetCXStr(pHisNameWnd->CGetWindowText(), szTemp, MAX_STRING - 1);
-                        if (szTemp[0] != '\0') {
-                            if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
-                                WriteChatf("\agMQ2AutoAccept :: Accepting trade from %s\ax", szTemp);
-                                SendWndClick2(pTRDW_Trade_Button,"leftmouseup");
-                                pTarget = nullptr;
-                            }
+                    if (!theirName.empty()) {
+                        if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
+                            WriteChatf("\agMQ2AutoAccept :: Accepting trade from %s\ax", theirName.c_str());
+                            SendWndClick2(pTRDW_Trade_Button,"leftmouseup");
+                            pTarget = nullptr;
                         }
                     }
                 } else {
@@ -655,29 +649,29 @@ PLUGIN_API VOID OnPulse()
     CXWnd* pWnd=(CXWnd *)FindMQ2Window("ConfirmationDialogBox");
     if(pWnd && pWnd->IsVisible()) {
         if(CXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
-            szTemp[0] = '\0';
-            GetCXStr(((CStmlWnd*)Child)->STMLText,szTemp,sizeof(szTemp));
+            CStmlWnd* cstm = (CStmlWnd*)Child;
+            CXStr windowText = cstm->STMLText;
 
-            if (strstr(szTemp,"percent")) {
+            if (ci_find_substr(windowText,"percent") != -1) {
                 // rez request
                 //DebugSpew("\agMQ2AutoAccept :: Ignoring rez\ax");
             }
-            else if (bTranslocate && (strstr(szTemp, "translocated to your bind point") || strstr(szTemp, "wish to be translocated by") )) {
+            else if (bTranslocate && (ci_find_substr(windowText, "translocated to your bind point") != -1 || ci_find_substr(windowText, "wish to be translocated by") != -1)) {
                 // Translocate request
                 WriteChatf("\agMQ2AutoAccept :: Accepting translocate\ax");
                 WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
             }
-            else if (bAnchor && strstr(szTemp, "to the real estate anchor in")) {
+            else if (bAnchor && ci_find_substr(windowText, "to the real estate anchor in") != -1) {
                 // Anchor portal request
                 for (auto& vRef : vAnchors)
                 {
-                    if (strstr(szTemp, vRef.c_str())) {
+                    if (ci_find_substr(windowText, vRef) != -1) {
                         WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal to \ax\at%s\ax", vRef.c_str());
                         WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
                     }
                 }
             }
-            else if (bSelfAnchor && strstr(szTemp, "transport yourself to the real estate")) {
+            else if (bSelfAnchor && ci_find_substr(windowText, "transport yourself to the real estate") != -1) {
                 // we cast the portal, accept it
                 WriteChatf("\agMQ2AutoAccept :: Accepting self anchor portal cast\ax");
                 WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
@@ -687,11 +681,7 @@ PLUGIN_API VOID OnPulse()
                 // All other confirmation boxes
                 for (auto& vRef : vNames)
                 {
-                    char szName[MAX_STRING] = { 0 };
-                    char szName2[MAX_STRING] = { 0 };
-                    sprintf_s(szName,"%s ", vRef.c_str());
-                    sprintf_s(szName2,"%s's", vRef.c_str());
-                    if(strstr(szTemp, szName) || strstr(szTemp, szName2)) {
+                    if(ci_find_substr(windowText,vRef + " ") != -1 || ci_find_substr(windowText,vRef + "'s") != -1) {
                         if (pWnd->GetChildItem("Yes_Button")) {
                             WriteChatf("\agMQ2AutoAccept :: Clicking Yes\ax");
                             WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
