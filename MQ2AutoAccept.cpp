@@ -485,7 +485,6 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 PLUGIN_API void InitializePlugin() {
     DebugSpewAlways("Initializing MQ2AutoAccept");
     AddCommand("/autoaccept",AutoAcceptCommand);
-    ShowHelp();
 }
 
 // Called once, when the plugin is to shutdown
