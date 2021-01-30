@@ -656,7 +656,7 @@ PLUGIN_API VOID OnPulse()
     if(pWnd && pWnd->IsVisible()) {
         if(CXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
             szTemp[0] = '\0';
-            GetCXStr(((CStmlWnd*)Child)->STMLText,szTemp,sizeof(szTemp));
+            GetCXStr(((CStmlWnd*)Child)->STMLText.Ptr,szTemp,sizeof(szTemp));
 
             if (strstr(szTemp,"percent")) {
                 // rez request
