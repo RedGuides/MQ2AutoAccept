@@ -270,9 +270,9 @@ void ShowHelp() {
     WriteChatf("/autoaccept list :: Lists users on your auto accept list.");
     WriteChatf("/autoaccept save :: Saves settings to ini. Changes \arDO NOT\ax auto save.");
     WriteChatf("/autoaccept load :: Loads settings from ini");
-    WriteChatf("/autoaccept add NAME :: Add NAME to the auto accept list. Proper case matters for matching later.");
+    WriteChatf("/autoaccept add NAME :: Add NAME to the auto accept list.");
     WriteChatf("/autoaccept del NAME :: Delete NAME from your auto accept list.");
-    WriteChatf("/autoaccept addanchor VALUE :: Add VALUE as a valid anchor target. Proper case matters for matching later. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
+    WriteChatf("/autoaccept addanchor VALUE :: Add VALUE as a valid anchor target. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
     WriteChatf("/autoaccept delanchor VALUE :: Delete VALUE from your valid anchor target list. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
 }
 
