@@ -505,35 +505,38 @@ PLUGIN_API DWORD OnIncomingChat(PCHAR Line, DWORD Color)
         return 0;
 
     char szName[MAX_STRING] = { 0 };
-    if (strstr(Line,"invites you to join a group.") && bGroup) {
-        GetArg(szName,Line,1);
-        // loop through user list and find a match for inviter. If found join group
-        for (auto& vRef : vNames)
-        {
-            if (!_strcmpi(szName, vRef.c_str())) {
-                DoCommand(pChar->pSpawn,"/timed 3s /invite");
-                WriteChatf("\agMQ2AutoAccept :: Joining group with %s\ax",szName);
+    if (bAutoAccept) {
+        if (strstr(Line, "invites you to join a group.") && bGroup) {
+            GetArg(szName, Line, 1);
+            // loop through user list and find a match for inviter. If found join group
+            for (auto& vRef : vNames)
+            {
+                if (!_strcmpi(szName, vRef.c_str())) {
+                    DoCommand(pChar->pSpawn, "/timed 3s /invite");
+                    WriteChatf("\agMQ2AutoAccept :: Joining group with %s\ax", szName);
+                }
             }
         }
-    } else if (strstr(Line,"invites you to join a fellowship.") && bFellowship) {
-        GetArg(szName,Line,1);
-        // loop through user list and find a match for inviter. If found join group
-        for (auto& vRef : vNames)
-        {
-            if (!_strcmpi(szName, vRef.c_str())) {
-                DoCommand(pChar->pSpawn,"/timed 3s /invite");
-                WriteChatf("\agMQ2AutoAccept :: Joining fellowship with %s\ax",szName);
+        else if (strstr(Line, "invites you to join a fellowship.") && bFellowship) {
+            GetArg(szName, Line, 1);
+            // loop through user list and find a match for inviter. If found join group
+            for (auto& vRef : vNames)
+            {
+                if (!_strcmpi(szName, vRef.c_str())) {
+                    DoCommand(pChar->pSpawn, "/timed 3s /invite");
+                    WriteChatf("\agMQ2AutoAccept :: Joining fellowship with %s\ax", szName);
+                }
             }
         }
-    }
-    else if (strstr(Line,"invites you to join a raid") && bRaid) {
-        GetArg(szName,Line,1);
-        // loop through user list and find a match for inviter. If found join raid
-        for (auto& vRef : vNames)
-        {
-            if (!_strcmpi(szName, vRef.c_str())) {
-                DoCommand(pChar->pSpawn,"/timed 3s /raidaccept");
-                WriteChatf("\agMQ2AutoAccept :: Joining raid with %s\ax",szName);
+        else if (strstr(Line, "invites you to join a raid") && bRaid) {
+            GetArg(szName, Line, 1);
+            // loop through user list and find a match for inviter. If found join raid
+            for (auto& vRef : vNames)
+            {
+                if (!_strcmpi(szName, vRef.c_str())) {
+                    DoCommand(pChar->pSpawn, "/timed 3s /raidaccept");
+                    WriteChatf("\agMQ2AutoAccept :: Joining raid with %s\ax", szName);
+                }
             }
         }
     }
