@@ -504,8 +504,8 @@ PLUGIN_API DWORD OnIncomingChat(PCHAR Line, DWORD Color)
     if (!pChar)
         return 0;
 
-    char szName[MAX_STRING] = { 0 };
     if (bAutoAccept) {
+        char szName[MAX_STRING] = { 0 };
         if (strstr(Line, "invites you to join a group.") && bGroup) {
             GetArg(szName, Line, 1);
             // loop through user list and find a match for inviter. If found join group
