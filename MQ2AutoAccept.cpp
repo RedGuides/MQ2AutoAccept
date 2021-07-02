@@ -661,7 +661,6 @@ PLUGIN_API VOID OnPulse()
             szTemp[0] = '\0';
             GetCXStr(((CStmlWnd*)Child)->STMLText,szTemp,sizeof(szTemp));
 
-            if (strstr(szTemp,"percent")) {
             if (strstr(szTemp,"percent") || strstr(szTemp, "return you to your corpse")) {
                 // rez request
                 //DebugSpew("\agMQ2AutoAccept :: Ignoring rez\ax");
