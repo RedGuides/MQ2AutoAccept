@@ -35,6 +35,7 @@ bool bFellowship = true;
 bool bRaid = true;
 bool bInitDone = false;
 bool bTradeReject = false;
+bool bUseServerNames = false;
 
 ULONGLONG rejectTimer = 0;
 
@@ -72,40 +73,56 @@ void ListAnchors() {
 	}
 }
 
+std::string GetPrefix(bool UseServerNames)
+{
+	std::string Prefix = "unknown";
+	if (pLocalPC)
+	{
+		Prefix = fmt::format("{}_", pLocalPC->Name);
+
+		if (UseServerNames)
+		{
+			Prefix = fmt::format("{}_{}", EQADDR_SERVERNAME, Prefix);
+		}
+	}
+	return Prefix;
+}
+
 void SaveINI()
 {
-	char szTemp[MAX_STRING] = { 0 };
-	// write on/off settings
-	sprintf_s(szTemp,"%s_Settings",GetCharInfo()->Name);
-	WritePrivateProfileSection(szTemp, "", INIFileName);
-	WritePrivateProfileString(szTemp,"Enabled",bAutoAccept ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"Translocate",bTranslocate ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"Anchor",bAnchor ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"SelfAnchor",bSelfAnchor ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"Trade",bTrade ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"TradeAlways",bTradeAlways ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"TradeReject",bTradeReject ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"Group",bGroup ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"Fellowship",bFellowship ? "1" : "0",INIFileName);
-	WritePrivateProfileString(szTemp,"Raid",bRaid ? "1" : "0",INIFileName);
+	std::string Prefix = GetPrefix(bUseServerNames);
+	WritePrivateProfileBool("General", "UseServerNames", bUseServerNames, INIFileName);
 
+	// write on/off settings
+	std::string strSettings = Prefix + "Settings";
+	WritePrivateProfileSection(strSettings, "", INIFileName);
+	WritePrivateProfileBool(strSettings, "Enabled", bAutoAccept, INIFileName);
+	WritePrivateProfileBool(strSettings, "Translocate", bTranslocate, INIFileName);
+	WritePrivateProfileBool(strSettings, "Anchor", bAnchor, INIFileName);
+	WritePrivateProfileBool(strSettings, "SelfAnchor", bSelfAnchor, INIFileName);
+	WritePrivateProfileBool(strSettings, "Trade", bTrade, INIFileName);
+	WritePrivateProfileBool(strSettings, "TradeAlways", bTradeAlways, INIFileName);
+	WritePrivateProfileBool(strSettings, "TradeReject", bTradeReject, INIFileName);
+	WritePrivateProfileBool(strSettings, "Group", bGroup, INIFileName);
+	WritePrivateProfileBool(strSettings, "Fellowship", bFellowship, INIFileName);
+	WritePrivateProfileBool(strSettings, "Raid", bRaid, INIFileName);
 
 	// write all names
-	sprintf_s(szTemp,"%s_Names",GetCharInfo()->Name);
-	WritePrivateProfileSection(szTemp, "", INIFileName);
+	std::string strNames = Prefix + "Names";
+	WritePrivateProfileSection(strNames.c_str(), "", INIFileName);
 	for (auto& vRef : vIniNames)
 	{
-		WritePrivateProfileString(szTemp, vRef, "1", INIFileName);
+		WritePrivateProfileString(strNames, vRef, "1", INIFileName);
 	}
 
 	char szA[MAX_STRING];
 	// write all anchors
-	sprintf_s(szTemp,"%s_Anchors",GetCharInfo()->Name);
-	WritePrivateProfileSection(szTemp, "", INIFileName);
+	std::string strAnchors = Prefix + "Anchors";
+	WritePrivateProfileSection(strAnchors.c_str(), "", INIFileName);
 	for (unsigned int a = 0; a < vAnchors.size(); a++) {
 		std::string& vRef = vAnchors[a];
 		sprintf_s(szA,"Anchor%d",a);
-		WritePrivateProfileString(szTemp,szA,vRef.c_str(),INIFileName);
+		WritePrivateProfileString(strAnchors, szA, vRef, INIFileName);
 	}
 	WriteChatf("MQ2AutoAccept :: Settings updated");
 }
@@ -117,22 +134,26 @@ void LoadINI()
 	if (!pChar)
 		return;
 
-	char szTemp[MAX_STRING] = { 0 };
-	sprintf_s(szTemp,"%s_Settings",pChar->Name);
-	bAutoAccept = GetPrivateProfileBool(szTemp, "Enabled", true, INIFileName);
-	bTranslocate = GetPrivateProfileBool(szTemp, "Translocate", false, INIFileName);
-	bAnchor = GetPrivateProfileBool(szTemp, "Anchor", false, INIFileName);
-	bSelfAnchor = GetPrivateProfileBool(szTemp, "SelfAnchor", false, INIFileName);
-	bTrade = GetPrivateProfileBool(szTemp, "Trade", true, INIFileName);
-	bTradeAlways = GetPrivateProfileBool(szTemp, "TradeAlways", false, INIFileName);
-	bTradeReject = GetPrivateProfileBool(szTemp, "TradeReject", false, INIFileName);
-	bGroup = GetPrivateProfileBool(szTemp, "Group", true, INIFileName);
-	bFellowship = GetPrivateProfileBool(szTemp, "Fellowship", true, INIFileName);
-	bRaid = GetPrivateProfileBool(szTemp, "Raid", true, INIFileName);
+	bUseServerNames = GetPrivateProfileBool("General", "UseServerNames", bUseServerNames, INIFileName);
+
+	std::string Prefix = GetPrefix(bUseServerNames);
+
+	std::string strSettings = Prefix + "Settings";
+
+	bAutoAccept = GetPrivateProfileBool(strSettings, "Enabled", true, INIFileName);
+	bTranslocate = GetPrivateProfileBool(strSettings, "Translocate", false, INIFileName);
+	bAnchor = GetPrivateProfileBool(strSettings, "Anchor", false, INIFileName);
+	bSelfAnchor = GetPrivateProfileBool(strSettings, "SelfAnchor", false, INIFileName);
+	bTrade = GetPrivateProfileBool(strSettings, "Trade", true, INIFileName);
+	bTradeAlways = GetPrivateProfileBool(strSettings, "TradeAlways", false, INIFileName);
+	bTradeReject = GetPrivateProfileBool(strSettings, "TradeReject", false, INIFileName);
+	bGroup = GetPrivateProfileBool(strSettings, "Group", true, INIFileName);
+	bFellowship = GetPrivateProfileBool(strSettings, "Fellowship", true, INIFileName);
+	bRaid = GetPrivateProfileBool(strSettings, "Raid", true, INIFileName);
 
 	// get all names
-	sprintf_s(szTemp,"%s_Names",pChar->Name);
-	GetPrivateProfileSection(szTemp,szList,MAX_STRING,INIFileName);
+	std::string strNames = Prefix + "Names";
+	GetPrivateProfileSection(strNames.c_str(), szList, MAX_STRING, INIFileName);
 
 	// clear list
 	vIniNames.clear();
@@ -204,8 +225,8 @@ void LoadINI()
 		ListUsers();
 
 	// get all anchors
-	sprintf_s(szTemp,"%s_Anchors",pChar->Name);
-	GetPrivateProfileSection(szTemp,szList,MAX_STRING,INIFileName);
+	std::string strAnchors = Prefix + "Anchors";
+	GetPrivateProfileSection(strAnchors.c_str(), szList, MAX_STRING, INIFileName);
 
 	// clear list
 	vAnchors.clear();
