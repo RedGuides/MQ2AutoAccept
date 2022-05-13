@@ -82,7 +82,7 @@ std::string GetPrefix(bool UseServerNames)
 
 		if (UseServerNames)
 		{
-			Prefix = fmt::format("{}_{}", EQADDR_SERVERNAME, Prefix);
+			Prefix = fmt::format("{}_{}", GetServerShortName(), Prefix);
 		}
 	}
 	return Prefix;
