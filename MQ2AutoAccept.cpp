@@ -700,6 +700,10 @@ PLUGIN_API void OnPulse()
 				WriteChatf("\agMQ2AutoAccept :: Accepting self anchor portal cast\ax");
 				WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
 			}
+			else if (ci_find_substr(windowText, "Remove") != -1 || ci_find_substr(windowText, "from the fellowship") != -1) {
+				// Remove someone from fellowship.
+				// DebugSpew("\agMQ2AutoAccept :: Ignoring removal from fellowship\ax");
+			}
 			//none of the above? do we have any names
 			else if (!vNames.empty()) {
 				// All other confirmation boxes
