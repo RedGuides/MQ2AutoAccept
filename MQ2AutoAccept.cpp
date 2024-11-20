@@ -603,7 +603,7 @@ PLUGIN_API void OnPulse()
 	// if we've clicked trade no need to check anything, let other person accept or reject
 	if (pTradeWnd && pTradeWnd->IsVisible() && !pTradeWnd->bMyReadyTrade) {
 		if (pTradeWnd->bHisReadyTrade) {
-			const CXStr theirName = pTradeWnd->HisNameLabel->Text;
+			CXStr theirName = pTradeWnd->HisNameLabel->GetText();
 			if (bTradeAlways) {
 				clickTrade = true;
 			} else {
@@ -641,7 +641,7 @@ PLUGIN_API void OnPulse()
 					}
 				}
 			}
-			if (  givingItem || givingMoney) {
+			if (givingItem || givingMoney) {
 				// We're giving item or coin, don't auto do anything
 				//DebugSpew("We're giving item or coin, don't do anything");
 			} else {
