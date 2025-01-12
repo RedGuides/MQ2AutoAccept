@@ -603,6 +603,11 @@ PLUGIN_API void OnPulse()
 	// if we've clicked trade no need to check anything, let other person accept or reject
 	if (pTradeWnd && pTradeWnd->IsVisible() && !pTradeWnd->bMyReadyTrade) {
 		if (pTradeWnd->bHisReadyTrade) {
+			if (!pTradeWnd->HisNameLabel) {
+				WriteChatf("\arTrade window is not initialized properly! New UI may be enabled or Trade window UI XML might be bad. Temporarily disabling MQ2AutoAccept.");
+				bAutoAccept = false;
+				return;
+			}
 			CXStr theirName = pTradeWnd->HisNameLabel->GetText();
 			if (bTradeAlways) {
 				clickTrade = true;
