@@ -565,14 +565,18 @@ PLUGIN_API bool OnIncomingChat(PCHAR Line, DWORD Color)
 	return false;
 }
 
-void WinClick(CXWnd *Wnd, PCHAR ScreenID, PCHAR ClickNotification, DWORD KeyState) {
+void WinClick(CXWnd* Wnd, const char* ScreenID, const char* ClickNotification, DWORD KeyState) {
 	if (Wnd && pWndMgr) {
-		if (CXWnd *Child = Wnd->GetChildItem(ScreenID)) {
+		if (CXWnd* Child = Wnd->GetChildItem(ScreenID)) {
 			bool KeyboardFlags[4];
-			*reinterpret_cast<DWORD*>(&KeyboardFlags) = *reinterpret_cast<DWORD*>(&pWndMgr->KeyboardFlags);
-			*reinterpret_cast<DWORD*>(&pWndMgr->KeyboardFlags) = KeyState;
+			static_assert(sizeof(KeyboardFlags) == sizeof(pWndMgr->KeyboardFlags));
+
+			memcpy(&KeyboardFlags, &pWndMgr->KeyboardFlags, sizeof(KeyboardFlags));
+			memcpy(&pWndMgr->KeyboardFlags, &KeyState, sizeof(KeyboardFlags));
+
 			SendWndClick2(Child, ClickNotification);
-			*reinterpret_cast<DWORD*>(&pWndMgr->KeyboardFlags) = *reinterpret_cast<DWORD*>(&KeyboardFlags);
+
+			memcpy(&pWndMgr->KeyboardFlags, &KeyboardFlags, sizeof(KeyboardFlags));
 		}
 	}
 }
