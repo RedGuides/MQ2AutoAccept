@@ -327,10 +327,12 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 
 	if(!_strnicmp(szTemp,"on",2)) {
 		bAutoAccept = true;
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: \agEnabled\ax");
 	}
 	else if(!_strnicmp(szTemp,"off",3)) {
 		bAutoAccept = false;
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: \arDisabled\ax");
 	}
 	else if(!_strnicmp(szTemp,"list",4)) {
@@ -351,6 +353,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 			}
 		}
 		vAnchors.push_back(szTemp);
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Added \ay%s\ax to anchor list", szTemp);
 	}
 	else if(!_strnicmp(szTemp,"add",3)) {
@@ -368,6 +371,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		}
 		vIniNames.push_back(szTemp);
 		CombineNames();
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Added \ay%s\ax to name list", szTemp);
 	}
 	else if(!_strnicmp(szTemp,"delanchor",9)) {
@@ -381,6 +385,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		}
 		if (delIndex >= 0) {
 			vAnchors.erase(vAnchors.begin() + delIndex);
+			SaveINI();
 			WriteChatf("MQ2AutoAccept :: Deleted anchor \ay%s\ax", szTemp);
 		} else {
 			WriteChatf("MQ2AutoAccept :: Anchor \ay%s\ax not found", szTemp);
@@ -398,6 +403,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		if (delIndex >= 0) {
 			CombineNames();
 			vIniNames.erase(vIniNames.begin() + delIndex);
+			SaveINI();
 			WriteChatf("MQ2AutoAccept :: Deleted user \ay%s\ax", szTemp);
 		} else {
 			WriteChatf("MQ2AutoAccept :: User \ay%s\ax not found", szTemp);
@@ -410,6 +416,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		} else if(!_strnicmp(szTemp,"off",3)) {
 			bSelfAnchor = false;
 		}
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if(!_strnicmp(szTemp,"anchor",6)) {
@@ -419,6 +426,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		} else if(!_strnicmp(szTemp,"off",3)) {
 			bAnchor = false;
 		}
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if(!_strnicmp(szTemp,"group",5)) {
@@ -428,6 +436,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		} else if(!_strnicmp(szTemp,"off",3)) {
 			bGroup = false;
 		}
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if(!_strnicmp(szTemp,"fellowship",10)) {
@@ -437,6 +446,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		} else if(!_strnicmp(szTemp,"off",3)) {
 			bFellowship = false;
 		}
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if(!_strnicmp(szTemp,"raid",4)) {
@@ -446,6 +456,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		} else if(!_strnicmp(szTemp,"off",3)) {
 			bRaid = false;
 		}
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if(!_strnicmp(szTemp,"trade",5)) {
@@ -486,6 +497,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 			WriteChatf("MQ2AutoAccept :: Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
 			return;
 		}
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if(!_strnicmp(szTemp,"translocate",11)) {
@@ -495,6 +507,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		} else if(!_strnicmp(szTemp,"off",3)) {
 			bTranslocate = false;
 		}
+		SaveINI();
 		WriteChatf("MQ2AutoAccept :: Translocate accept is %s", bTranslocate ? "\agON\ax" : "\arOFF\ax");
 	}
 	else {
