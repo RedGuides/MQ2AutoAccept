@@ -339,7 +339,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 	}
 	else if (ci_equals(szTemp, "addanchor", 9)) {
 		GetArg(szTemp, zLine, 2);
-		if (!_strcmpi(szTemp, "")) {
+		if (szTemp[0] == '\0') {
 			WriteChatf("Usage: /autoaccept addanchor \"VALUE\"");
 			return;
 		}
@@ -355,7 +355,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 	}
 	else if (ci_equals(szTemp, "add", 3)) {
 		GetArg(szTemp, zLine, 2);
-		if (!_strcmpi(szTemp, "")) {
+		if (szTemp[0] == '\0') {
 			WriteChatf("Usage: /autoaccept add NAME");
 			return;
 		}
@@ -458,7 +458,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		}
 		else if (ci_equals(szTemp, "reject", 6)) {
 			GetArg(szTemp, zLine, 3);
-			if (!_strcmpi(szTemp, "")) {
+			if (szTemp[0] == '\0') {
 				WriteChatf("Usage: /autoaccept trade reject on|off");
 				return;
 			}
@@ -473,7 +473,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		}
 		else if (ci_equals(szTemp, "always", 6)) {
 			GetArg(szTemp, zLine, 3);
-			if (!_strcmpi(szTemp, "")) {
+			if (szTemp[0] == '\0') {
 				WriteChatf("Usage: /autoaccept trade always on|off");
 				return;
 			}
