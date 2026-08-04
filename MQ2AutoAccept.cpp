@@ -25,7 +25,12 @@ constexpr int MAX_TRADE_COIN_SLOTS = 4;
 
 char szList[MAX_STRING];
 bool bAutoAccept = false;
-bool bTranslocate = false;
+enum class eAcceptMode : int {
+	Never = 0,
+	Trusted = 1,
+	Always = 2,
+};
+eAcceptMode translocateMode = eAcceptMode::Never; // was: bool bTranslocate = false;
 bool bAnchor = false;
 bool bSelfAnchor = false;
 bool bTrade = true;
@@ -36,6 +41,38 @@ bool bRaid = true;
 bool bInitDone = false;
 bool bTradeReject = false;
 bool bUseServerNames = false;
+
+const char* AcceptModeToString(eAcceptMode mode) {
+	switch (mode) {
+		case eAcceptMode::Always: {
+			return "Always";
+		}
+		case eAcceptMode::Trusted: {
+			return "Trusted";
+		}
+		default: {
+			return "Never";
+		}
+	}
+}
+
+eAcceptMode AcceptModeFromString(const std::string& str, eAcceptMode fallback = eAcceptMode::Never) {
+	// on/1 for legacy compatability
+	if (ci_equals(str, "always") || ci_equals(str, "on") || ci_equals(str, "1")) {
+		return eAcceptMode::Always;
+	}
+
+	if (ci_equals(str, "trusted")) {
+		return eAcceptMode::Trusted;
+	}
+
+	// off/0 for legacy compatability
+	if (ci_equals(str, "never") || ci_equals(str, "off") || ci_equals(str, "0")) {
+		return eAcceptMode::Never;
+	}
+
+	return fallback;
+}
 
 ULONGLONG rejectTimer = 0;
 
@@ -97,7 +134,7 @@ void SaveINI()
 	std::string strSettings = Prefix + "Settings";
 	WritePrivateProfileSection(strSettings, "", INIFileName);
 	WritePrivateProfileBool(strSettings, "Enabled", bAutoAccept, INIFileName);
-	WritePrivateProfileBool(strSettings, "Translocate", bTranslocate, INIFileName);
+	WritePrivateProfileString(strSettings, "Translocate", AcceptModeToString(translocateMode), INIFileName);
 	WritePrivateProfileBool(strSettings, "Anchor", bAnchor, INIFileName);
 	WritePrivateProfileBool(strSettings, "SelfAnchor", bSelfAnchor, INIFileName);
 	WritePrivateProfileBool(strSettings, "Trade", bTrade, INIFileName);
@@ -141,7 +178,7 @@ void LoadINI()
 	std::string strSettings = Prefix + "Settings";
 
 	bAutoAccept = GetPrivateProfileBool(strSettings, "Enabled", true, INIFileName);
-	bTranslocate = GetPrivateProfileBool(strSettings, "Translocate", false, INIFileName);
+	translocateMode = AcceptModeFromString(GetPrivateProfileString(strSettings, "Translocate", "Never", INIFileName));
 	bAnchor = GetPrivateProfileBool(strSettings, "Anchor", false, INIFileName);
 	bSelfAnchor = GetPrivateProfileBool(strSettings, "SelfAnchor", false, INIFileName);
 	bTrade = GetPrivateProfileBool(strSettings, "Trade", true, INIFileName);
@@ -279,7 +316,7 @@ void ShowHelp() {
 	WriteChatf("\atMQ2AutoAccept :: v%1.2f :: by Sym for RedGuides.com\ax", MQ2Version);
 	WriteChatf("/autoaccept :: Lists command syntax");
 	WriteChatf("/autoaccept on|off :: Main accept toggle. Nothing else will accept if this is off. Default \ag*ON*\ax");
-	WriteChatf("/autoaccept translocate on|off :: Toggle acceptance of translocate or zephyr port.  Default \ar*OFF*\ax");
+	WriteChatf("/autoaccept translocate always|trusted|never :: Accept translocate/zephyr casts. Always = anyone, Trusted = only names on your list, Never = ignore. Default \ar*NEVER*\ax");
 	WriteChatf("/autoaccept anchor on|off :: Toggle acceptance of primary/secondary real estate anchor port.  Default \ar*OFF*\ax");
 	WriteChatf("/autoaccept selfanchor on|off :: Toggle acceptance of primary/secondary real estate anchor port when you cast it.  Default \ar*OFF*\ax");
 	WriteChatf("/autoaccept trade on|off :: Toggle acceptance of trades by people on the auto accept list. Default \ag*ON*\ax");
@@ -321,7 +358,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		WriteChatf("MQ2AutoAccept :: Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
 		WriteChatf("MQ2AutoAccept :: Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
 		WriteChatf("MQ2AutoAccept :: Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Translocate accept is %s", bTranslocate ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf("MQ2AutoAccept :: Translocate accept is \at%s\ax", AcceptModeToString(translocateMode));
 		return;
 	}
 
@@ -490,12 +527,13 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 	}
 	else if (ci_equals(szTemp, "translocate")) {
 		GetArg(szTemp, zLine, 2);
-		if(!_strnicmp(szTemp,"on",2)) {
-			bTranslocate = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
-			bTranslocate = false;
+		if (szTemp[0] == '\0') {
+			WriteChatf("Usage: /autoaccept translocate always|trusted|never");
 		}
-		WriteChatf("MQ2AutoAccept :: Translocate accept is %s", bTranslocate ? "\agON\ax" : "\arOFF\ax");
+		else {
+			translocateMode = AcceptModeFromString(szTemp, translocateMode);
+		}
+		WriteChatf("\agMQ2AutoAccept :: Translocate accept is \ax\at%s\ax", AcceptModeToString(translocateMode));
 	}
 	else {
 		ShowHelp();
@@ -689,25 +727,49 @@ PLUGIN_API void OnPulse()
 				// rez request
 				//DebugSpew("\agMQ2AutoAccept :: Ignoring rez\ax");
 			}
-			else if (bTranslocate && (ci_find_substr(windowText, "translocated to your bind point") != -1 || ci_find_substr(windowText, "wish to be translocated by") != -1)) {
+			else if (ci_find_substr(windowText, "translocated to your bind point") != -1 ||
+				ci_find_substr(windowText, "wish to be translocated by") != -1) {
 				// Translocate request
-				WriteChatf("\agMQ2AutoAccept :: Accepting translocate\ax");
-				WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
+				bool accept = false;
+				if (translocateMode == eAcceptMode::Always) {
+					accept = true;
+				}
+				else if (translocateMode == eAcceptMode::Trusted) {
+					for (auto& vRef : vNames)
+					{
+						if (ci_find_substr(windowText, vRef + " ") != -1 || ci_find_substr(windowText, vRef + "'s") != -1) {
+							accept = true;
+							break;
+						}
+					}
+				}
+
+				if (accept) {
+					WriteChatf("\agMQ2AutoAccept :: Accepting translocate\ax");
+					WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+					return;
+				}
 			}
-			else if (bAnchor && ci_find_substr(windowText, "to the real estate anchor in") != -1) {
+			else if (ci_find_substr(windowText, "to the real estate anchor in") != -1) {
 				// Anchor portal request
-				for (auto& vRef : vAnchors)
-				{
-					if (ci_find_substr(windowText, vRef) != -1) {
-						WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal to \ax\at%s\ax", vRef.c_str());
-						WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
+				if (bAnchor) {
+					for (auto& vRef : vAnchors)
+					{
+						if (ci_find_substr(windowText, vRef) != -1) {
+							WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal to \ax\at%s\ax", vRef.c_str());
+							WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+							return;
+						}
 					}
 				}
 			}
-			else if (bSelfAnchor && ci_find_substr(windowText, "transport yourself to the real estate") != -1) {
+			else if (ci_find_substr(windowText, "transport yourself to the real estate") != -1) {
 				// we cast the portal, accept it
-				WriteChatf("\agMQ2AutoAccept :: Accepting self anchor portal cast\ax");
-				WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+				if (bSelfAnchor) {
+					WriteChatf("\agMQ2AutoAccept :: Accepting self anchor portal cast\ax");
+					WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+					return;
+				}
 			}
 			else if (ci_find_substr(windowText, "from the fellowship") != -1 && ci_find_substr(windowText, "Remove") != -1) {
 				// Remove someone from fellowship.
