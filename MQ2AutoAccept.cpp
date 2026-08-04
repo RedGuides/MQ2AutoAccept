@@ -302,16 +302,16 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 	char szTemp[MAX_STRING] = { 0 };
 	GetArg(szTemp, zLine, 1);
 
-	if (ci_equals(szTemp, "load", 4)) {
+	if (ci_equals(szTemp, "load")) {
 		LoadINI();
 		return;
 	}
-	if (ci_equals(szTemp, "save", 4)) {
+	if (ci_equals(szTemp, "save")) {
 		SaveINI();
 		return;
 	}
 
-	if (ci_equals(szTemp, "status", 6)) {
+	if (ci_equals(szTemp, "status")) {
 		WriteChatf("MQ2AutoAccept :: %s", bAutoAccept ? "\agENABLED\ax" : "\arDISABLED\ax");
 		WriteChatf("MQ2AutoAccept :: Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
 		WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
@@ -325,19 +325,19 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		return;
 	}
 
-	if (ci_equals(szTemp, "on", 2)) {
+	if (ci_equals(szTemp, "on")) {
 		bAutoAccept = true;
 		WriteChatf("MQ2AutoAccept :: \agEnabled\ax");
 	}
-	else if (ci_equals(szTemp, "off", 3)) {
+	else if (ci_equals(szTemp, "off")) {
 		bAutoAccept = false;
 		WriteChatf("MQ2AutoAccept :: \arDisabled\ax");
 	}
-	else if (ci_equals(szTemp, "list", 4)) {
+	else if (ci_equals(szTemp, "list")) {
 		ListUsers();
 		ListAnchors();
 	}
-	else if (ci_equals(szTemp, "addanchor", 9)) {
+	else if (ci_equals(szTemp, "addanchor")) {
 		GetArg(szTemp, zLine, 2);
 		if (szTemp[0] == '\0') {
 			WriteChatf("Usage: /autoaccept addanchor \"VALUE\"");
@@ -353,7 +353,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		vAnchors.push_back(szTemp);
 		WriteChatf("MQ2AutoAccept :: Added \ay%s\ax to anchor list", szTemp);
 	}
-	else if (ci_equals(szTemp, "add", 3)) {
+	else if (ci_equals(szTemp, "add")) {
 		GetArg(szTemp, zLine, 2);
 		if (szTemp[0] == '\0') {
 			WriteChatf("Usage: /autoaccept add NAME");
@@ -370,7 +370,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		CombineNames();
 		WriteChatf("MQ2AutoAccept :: Added \ay%s\ax to name list", szTemp);
 	}
-	else if (ci_equals(szTemp, "delanchor", 9)) {
+	else if (ci_equals(szTemp, "delanchor")) {
 		int delIndex = -1;
 		GetArg(szTemp, zLine, 2);
 		for (unsigned int a = 0; a < vAnchors.size(); a++) {
@@ -386,7 +386,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 			WriteChatf("MQ2AutoAccept :: Anchor \ay%s\ax not found", szTemp);
 		}
 	}
-	else if (ci_equals(szTemp, "del", 3)) {
+	else if (ci_equals(szTemp, "del")) {
 		int delIndex = -1;
 		GetArg(szTemp, zLine, 2);
 		for (unsigned int a = 0; a < vIniNames.size(); a++) {
@@ -403,84 +403,84 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 			WriteChatf("MQ2AutoAccept :: User \ay%s\ax not found", szTemp);
 		}
 	}
-	else if (ci_equals(szTemp, "selfanchor", 10)) {
+	else if (ci_equals(szTemp, "selfanchor")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on", 2)) {
+		if (ci_equals(szTemp, "on")) {
 			bSelfAnchor = true;
-		} else if (ci_equals(szTemp, "off", 3)) {
+		} else if (ci_equals(szTemp, "off")) {
 			bSelfAnchor = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if (ci_equals(szTemp, "anchor", 6)) {
+	else if (ci_equals(szTemp, "anchor")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on", 2)) {
+		if (ci_equals(szTemp, "on")) {
 			bAnchor = true;
-		} else if (ci_equals(szTemp, "off", 3)) {
+		} else if (ci_equals(szTemp, "off")) {
 			bAnchor = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if (ci_equals(szTemp, "group", 5)) {
+	else if (ci_equals(szTemp, "group")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on", 2)) {
+		if (ci_equals(szTemp, "on")) {
 			bGroup = true;
-		} else if (ci_equals(szTemp, "off", 3)) {
+		} else if (ci_equals(szTemp, "off")) {
 			bGroup = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if (ci_equals(szTemp, "fellowship", 10)) {
+	else if (ci_equals(szTemp, "fellowship")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on", 2)) {
+		if (ci_equals(szTemp, "on")) {
 			bFellowship = true;
-		} else if (ci_equals(szTemp, "off", 3)) {
+		} else if (ci_equals(szTemp, "off")) {
 			bFellowship = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if (ci_equals(szTemp, "raid", 4)) {
+	else if (ci_equals(szTemp, "raid")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on", 2)) {
+		if (ci_equals(szTemp, "on")) {
 			bRaid = true;
-		} else if (ci_equals(szTemp, "off", 3)) {
+		} else if (ci_equals(szTemp, "off")) {
 			bRaid = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if (ci_equals(szTemp, "trade", 5)) {
+	else if (ci_equals(szTemp, "trade")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on", 2)) {
+		if (ci_equals(szTemp, "on")) {
 			bTrade = true;
-		} else if (ci_equals(szTemp, "off", 3)) {
+		} else if (ci_equals(szTemp, "off")) {
 			bTrade = false;
 			bTradeAlways = false;
 		}
-		else if (ci_equals(szTemp, "reject", 6)) {
+		else if (ci_equals(szTemp, "reject")) {
 			GetArg(szTemp, zLine, 3);
 			if (szTemp[0] == '\0') {
 				WriteChatf("Usage: /autoaccept trade reject on|off");
 				return;
 			}
-			if (ci_equals(szTemp, "on", 2)) {
+			if (ci_equals(szTemp, "on")) {
 				bTrade = true;
 				bTradeReject = true;
-			} else if (ci_equals(szTemp, "off", 3)) {
+			} else if (ci_equals(szTemp, "off")) {
 				bTradeReject = false;
 			}
 			WriteChatf("MQ2AutoAccept :: Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
 			return;
 		}
-		else if (ci_equals(szTemp, "always", 6)) {
+		else if (ci_equals(szTemp, "always")) {
 			GetArg(szTemp, zLine, 3);
 			if (szTemp[0] == '\0') {
 				WriteChatf("Usage: /autoaccept trade always on|off");
 				return;
 			}
-			if (ci_equals(szTemp, "on", 2)) {
+			if (ci_equals(szTemp, "on")) {
 				bTrade = true;
 				bTradeAlways = true;
-			} else if (ci_equals(szTemp, "off", 3)) {
+			} else if (ci_equals(szTemp, "off")) {
 				bTradeAlways = false;
 			}
 			WriteChatf("MQ2AutoAccept :: Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
@@ -488,7 +488,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		}
 		WriteChatf("MQ2AutoAccept :: Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if (!_strnicmp(szTemp, "translocate", 11)) {
+	else if (ci_equals(szTemp, "translocate")) {
 		GetArg(szTemp, zLine, 2);
 		if(!_strnicmp(szTemp,"on",2)) {
 			bTranslocate = true;
@@ -681,7 +681,7 @@ PLUGIN_API void OnPulse()
 
 	CXWnd* pWnd=(CXWnd *)FindMQ2Window("ConfirmationDialogBox");
 	if (pWnd && pWnd->IsVisible()) {
-		if (cXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
+		if (CXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
 			CStmlWnd* cstm = (CStmlWnd*)Child;
 			CXStr windowText = cstm->STMLText;
 
