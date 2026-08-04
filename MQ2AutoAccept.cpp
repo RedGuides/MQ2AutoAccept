@@ -121,7 +121,7 @@ void SaveINI()
 	WritePrivateProfileSection(strAnchors.c_str(), "", INIFileName);
 	for (unsigned int a = 0; a < vAnchors.size(); a++) {
 		std::string& vRef = vAnchors[a];
-		sprintf_s(szA,"Anchor%d",a);
+		sprintf_s(szA, "Anchor%d", a);
 		WritePrivateProfileString(strAnchors, szA, vRef, INIFileName);
 	}
 	WriteChatf("MQ2AutoAccept :: Settings updated");
@@ -172,7 +172,7 @@ void LoadINI()
 	{
 		length = strlen(p);
 		// split entries on =
-		pch = strtok_s(p,"=",&Next_Token1);
+		pch = strtok_s(p, "=", &Next_Token1);
 		while (pch != nullptr)
 		{
 			// Odd entries are the names. Add it to the list
@@ -189,7 +189,7 @@ void LoadINI()
 		p++;
 	}
 	// if we have entries show them
-	GetPrivateProfileSection("Global_Names",szList,MAX_STRING,INIFileName);
+	GetPrivateProfileSection("Global_Names", szList, MAX_STRING, INIFileName);
 	vGlobalNames.clear();
 
 	p = (char*)szList;
@@ -202,17 +202,17 @@ void LoadINI()
 	{
 		length = strlen(p);
 		// split entries on =
-		pch = strtok_s(p,"=",&Next_Token1);
+		pch = strtok_s(p, "=", &Next_Token1);
 		while (pch != nullptr)
 		{
 			// Odd entries are the names. Add it to the list
 			vGlobalNames.push_back(pch);
 
 			// next is value. Don't use it so skip it
-			pch = strtok_s(nullptr, "=",&Next_Token1);
+			pch = strtok_s(nullptr, "=", &Next_Token1);
 
 			// next name
-			pch = strtok_s(nullptr, "=",&Next_Token1);
+			pch = strtok_s(nullptr, "=", &Next_Token1);
 			i++;
 		}
 		p += length;
@@ -241,18 +241,18 @@ void LoadINI()
 	{
 		length = strlen(p);
 		// split entries on =
-		pch = strtok_s(p,"=",&Next_Token1);
+		pch = strtok_s(p, "=", &Next_Token1);
 		while (pch != nullptr)
 		{
 			// Odd values are the numbered entries. Don't use it so skip it
-			pch = strtok_s(nullptr, "=",&Next_Token1);
+			pch = strtok_s(nullptr, "=", &Next_Token1);
 
 			// Even entries are the anchor values. Add it to the list
-			if(pch)
+			if (pch)
 				vAnchors.push_back(pch);
 
 			// next anchor
-			pch = strtok_s(nullptr, "=",&Next_Token1);
+			pch = strtok_s(nullptr, "=", &Next_Token1);
 			i++;
 		}
 		p += length;
@@ -266,10 +266,10 @@ void LoadINI()
 }
 
 PLUGIN_API void SetGameState(int GameState) {
-	if(GameState==GAMESTATE_INGAME) {
+	if (GameState==GAMESTATE_INGAME) {
 		if (!bInitDone)
 			LoadINI();
-	} else if(GameState!=GAMESTATE_LOGGINGIN) {
+	} else if (GameState!=GAMESTATE_LOGGINGIN) {
 		if (bInitDone)
 			bInitDone=false;
 	}
@@ -300,18 +300,18 @@ void ShowHelp() {
 
 void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 	char szTemp[MAX_STRING] = { 0 };
-	GetArg(szTemp,zLine,1);
+	GetArg(szTemp, zLine, 1);
 
-	if(!_strnicmp(szTemp,"load",4)) {
+	if (ci_equals(szTemp, "load", 4)) {
 		LoadINI();
 		return;
 	}
-	if(!_strnicmp(szTemp,"save",4)) {
+	if (ci_equals(szTemp, "save", 4)) {
 		SaveINI();
 		return;
 	}
 
-	if(!_strnicmp(szTemp,"status",6)) {
+	if (ci_equals(szTemp, "status", 6)) {
 		WriteChatf("MQ2AutoAccept :: %s", bAutoAccept ? "\agENABLED\ax" : "\arDISABLED\ax");
 		WriteChatf("MQ2AutoAccept :: Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
 		WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
@@ -325,27 +325,27 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		return;
 	}
 
-	if(!_strnicmp(szTemp,"on",2)) {
+	if (ci_equals(szTemp, "on", 2)) {
 		bAutoAccept = true;
 		WriteChatf("MQ2AutoAccept :: \agEnabled\ax");
 	}
-	else if(!_strnicmp(szTemp,"off",3)) {
+	else if (ci_equals(szTemp, "off", 3)) {
 		bAutoAccept = false;
 		WriteChatf("MQ2AutoAccept :: \arDisabled\ax");
 	}
-	else if(!_strnicmp(szTemp,"list",4)) {
+	else if (ci_equals(szTemp, "list", 4)) {
 		ListUsers();
 		ListAnchors();
 	}
-	else if(!_strnicmp(szTemp,"addanchor",9)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strcmpi(szTemp, "")) {
+	else if (ci_equals(szTemp, "addanchor", 9)) {
+		GetArg(szTemp, zLine, 2);
+		if (!_strcmpi(szTemp, "")) {
 			WriteChatf("Usage: /autoaccept addanchor \"VALUE\"");
 			return;
 		}
 		for (unsigned int a = 0; a < vAnchors.size(); a++) {
 			std::string& vRef = vAnchors[a];
-			if (!_strcmpi(szTemp,vRef.c_str())) {
+			if (!_strcmpi(szTemp, vRef.c_str())) {
 				WriteChatf("MQ2AutoAccept :: Anchor \ay%s\ax already exists", szTemp);
 				return;
 			}
@@ -353,15 +353,15 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		vAnchors.push_back(szTemp);
 		WriteChatf("MQ2AutoAccept :: Added \ay%s\ax to anchor list", szTemp);
 	}
-	else if(!_strnicmp(szTemp,"add",3)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strcmpi(szTemp, "")) {
+	else if (ci_equals(szTemp, "add", 3)) {
+		GetArg(szTemp, zLine, 2);
+		if (!_strcmpi(szTemp, "")) {
 			WriteChatf("Usage: /autoaccept add NAME");
 			return;
 		}
 		for (unsigned int a = 0; a < vIniNames.size(); a++) {
 			std::string& vRef = vIniNames[a];
-			if (!_strcmpi(szTemp,vRef.c_str())) {
+			if (!_strcmpi(szTemp, vRef.c_str())) {
 				WriteChatf("MQ2AutoAccept :: User \ay%s\ax already exists", szTemp);
 				return;
 			}
@@ -370,12 +370,12 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		CombineNames();
 		WriteChatf("MQ2AutoAccept :: Added \ay%s\ax to name list", szTemp);
 	}
-	else if(!_strnicmp(szTemp,"delanchor",9)) {
+	else if (ci_equals(szTemp, "delanchor", 9)) {
 		int delIndex = -1;
-		GetArg(szTemp,zLine,2);
+		GetArg(szTemp, zLine, 2);
 		for (unsigned int a = 0; a < vAnchors.size(); a++) {
 			std::string& vRef = vAnchors[a];
-			if (!_strcmpi(szTemp,vRef.c_str())) {
+			if (!_strcmpi(szTemp, vRef.c_str())) {
 				delIndex = a;
 			}
 		}
@@ -386,12 +386,12 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 			WriteChatf("MQ2AutoAccept :: Anchor \ay%s\ax not found", szTemp);
 		}
 	}
-	else if(!_strnicmp(szTemp,"del",3)) {
+	else if (ci_equals(szTemp, "del", 3)) {
 		int delIndex = -1;
-		GetArg(szTemp,zLine,2);
+		GetArg(szTemp, zLine, 2);
 		for (unsigned int a = 0; a < vIniNames.size(); a++) {
 			std::string& vRef = vIniNames[a];
-			if (!_strcmpi(szTemp,vRef.c_str())) {
+			if (!_strcmpi(szTemp, vRef.c_str())) {
 				delIndex = a;
 			}
 		}
@@ -403,84 +403,84 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 			WriteChatf("MQ2AutoAccept :: User \ay%s\ax not found", szTemp);
 		}
 	}
-	else if(!_strnicmp(szTemp,"selfanchor",10)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
+	else if (ci_equals(szTemp, "selfanchor", 10)) {
+		GetArg(szTemp, zLine, 2);
+		if (ci_equals(szTemp, "on", 2)) {
 			bSelfAnchor = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
+		} else if (ci_equals(szTemp, "off", 3)) {
 			bSelfAnchor = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"anchor",6)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
+	else if (ci_equals(szTemp, "anchor", 6)) {
+		GetArg(szTemp, zLine, 2);
+		if (ci_equals(szTemp, "on", 2)) {
 			bAnchor = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
+		} else if (ci_equals(szTemp, "off", 3)) {
 			bAnchor = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"group",5)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
+	else if (ci_equals(szTemp, "group", 5)) {
+		GetArg(szTemp, zLine, 2);
+		if (ci_equals(szTemp, "on", 2)) {
 			bGroup = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
+		} else if (ci_equals(szTemp, "off", 3)) {
 			bGroup = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"fellowship",10)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
+	else if (ci_equals(szTemp, "fellowship", 10)) {
+		GetArg(szTemp, zLine, 2);
+		if (ci_equals(szTemp, "on", 2)) {
 			bFellowship = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
+		} else if (ci_equals(szTemp, "off", 3)) {
 			bFellowship = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"raid",4)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
+	else if (ci_equals(szTemp, "raid", 4)) {
+		GetArg(szTemp, zLine, 2);
+		if (ci_equals(szTemp, "on", 2)) {
 			bRaid = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
+		} else if (ci_equals(szTemp, "off", 3)) {
 			bRaid = false;
 		}
 		WriteChatf("MQ2AutoAccept :: Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"trade",5)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
+	else if (ci_equals(szTemp, "trade", 5)) {
+		GetArg(szTemp, zLine, 2);
+		if (ci_equals(szTemp, "on", 2)) {
 			bTrade = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
+		} else if (ci_equals(szTemp, "off", 3)) {
 			bTrade = false;
 			bTradeAlways = false;
 		}
-		else if(!_strnicmp(szTemp,"reject",6)) {
-			GetArg(szTemp,zLine,3);
-			if(!_strcmpi(szTemp, "")) {
+		else if (ci_equals(szTemp, "reject", 6)) {
+			GetArg(szTemp, zLine, 3);
+			if (!_strcmpi(szTemp, "")) {
 				WriteChatf("Usage: /autoaccept trade reject on|off");
 				return;
 			}
-			if(!_strnicmp(szTemp,"on",2)) {
+			if (ci_equals(szTemp, "on", 2)) {
 				bTrade = true;
 				bTradeReject = true;
-			} else if(!_strnicmp(szTemp,"off",3)) {
+			} else if (ci_equals(szTemp, "off", 3)) {
 				bTradeReject = false;
 			}
 			WriteChatf("MQ2AutoAccept :: Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
 			return;
 		}
-		else if(!_strnicmp(szTemp,"always",6)) {
-			GetArg(szTemp,zLine,3);
-			if(!_strcmpi(szTemp, "")) {
+		else if (ci_equals(szTemp, "always", 6)) {
+			GetArg(szTemp, zLine, 3);
+			if (!_strcmpi(szTemp, "")) {
 				WriteChatf("Usage: /autoaccept trade always on|off");
 				return;
 			}
-			if(!_strnicmp(szTemp,"on",2)) {
+			if (ci_equals(szTemp, "on", 2)) {
 				bTrade = true;
 				bTradeAlways = true;
-			} else if(!_strnicmp(szTemp,"off",3)) {
+			} else if (ci_equals(szTemp, "off", 3)) {
 				bTradeAlways = false;
 			}
 			WriteChatf("MQ2AutoAccept :: Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
@@ -488,8 +488,8 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 		}
 		WriteChatf("MQ2AutoAccept :: Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"translocate",11)) {
-		GetArg(szTemp,zLine,2);
+	else if (!_strnicmp(szTemp, "translocate", 11)) {
+		GetArg(szTemp, zLine, 2);
 		if(!_strnicmp(szTemp,"on",2)) {
 			bTranslocate = true;
 		} else if(!_strnicmp(szTemp,"off",3)) {
@@ -506,7 +506,7 @@ void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
 // Called once, when the plugin is to initialize
 PLUGIN_API void InitializePlugin() {
 	DebugSpewAlways("Initializing MQ2AutoAccept");
-	AddCommand("/autoaccept",AutoAcceptCommand);
+	AddCommand("/autoaccept", AutoAcceptCommand);
 }
 
 // Called once, when the plugin is to shutdown
@@ -632,7 +632,7 @@ PLUGIN_API void OnPulse()
 				if (CXWnd* pTRDW_TradeSlotWnd = pTradeWnd->GetChildItem(&strSlotName[0])) {
 					const auto toolTip = pTRDW_TradeSlotWnd->GetTooltip();
 					if (!toolTip.empty()) {
-						//DebugSpew("Giving %s in slot %d",szTemp, n);
+						//DebugSpew("Giving %s in slot %d", szTemp, n);
 						givingItem = true;
 						break;
 					}
@@ -644,7 +644,7 @@ PLUGIN_API void OnPulse()
 				if (CXWnd* pTRDW_MyMoneyWnd = pTradeWnd->GetChildItem(&strSlotName[0])) {
 					const auto windowText = pTRDW_MyMoneyWnd->GetWindowText();
 					if (!windowText.empty() && GetIntFromString(windowText, 0) > 0) {
-						//DebugSpew("Giving %s in slot %d",szTemp, n);
+						//DebugSpew("Giving %s in slot %d", szTemp, n);
 						givingMoney = true;
 						break;
 					}
@@ -658,7 +658,7 @@ PLUGIN_API void OnPulse()
 					if (!theirName.empty()) {
 						if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
 							WriteChatf("\agMQ2AutoAccept :: Accepting trade from %s\ax", theirName.c_str());
-							SendWndClick2(pTRDW_Trade_Button,"leftmouseup");
+							SendWndClick2(pTRDW_Trade_Button, "leftmouseup");
 							pTarget = nullptr;
 						}
 					}
@@ -670,7 +670,7 @@ PLUGIN_API void OnPulse()
 							rejectTimer = 0;
 							if (CXWnd* pTRDW_Cancel_Button = pTradeWnd->GetChildItem("TRDW_Cancel_Button")) {
 								WriteChatf("\arMQ2AutoAccept :: Canceling Trade\ax");
-								SendWndClick2(pTRDW_Cancel_Button,"leftmouseup");
+								SendWndClick2(pTRDW_Cancel_Button, "leftmouseup");
 							}
 						}
 					}
@@ -680,8 +680,8 @@ PLUGIN_API void OnPulse()
 	}
 
 	CXWnd* pWnd=(CXWnd *)FindMQ2Window("ConfirmationDialogBox");
-	if(pWnd && pWnd->IsVisible()) {
-		if(CXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
+	if (pWnd && pWnd->IsVisible()) {
+		if (cXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
 			CStmlWnd* cstm = (CStmlWnd*)Child;
 			CXStr windowText = cstm->STMLText;
 
@@ -718,14 +718,14 @@ PLUGIN_API void OnPulse()
 				// All other confirmation boxes
 				for (auto& vRef : vNames)
 				{
-					if(ci_find_substr(windowText,vRef + " ") != -1 || ci_find_substr(windowText,vRef + "'s") != -1) {
+					if (ci_find_substr(windowText, vRef + " ") != -1 || ci_find_substr(windowText, vRef + "'s") != -1) {
 						if (pWnd->GetChildItem("Yes_Button")) {
 							WriteChatf("\agMQ2AutoAccept :: Clicking Yes\ax");
-							WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
+							WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
 						}
 						else if (pWnd->GetChildItem("OK_Button")) {
 							WriteChatf("\agMQ2AutoAccept :: Clicking OK\ax");
-							WinClick(FindMQ2Window("ConfirmationDialogBox"),"OK_Button","leftmouseup",1);
+							WinClick(FindMQ2Window("ConfirmationDialogBox"), "OK_Button", "leftmouseup", 1);
 						}
 						return;
 					}
