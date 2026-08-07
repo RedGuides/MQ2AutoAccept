@@ -317,7 +317,7 @@ void ShowHelp() {
 	WriteChatf(PLUGINMSG "\atv%1.2f :: by Sym for RedGuides.com\ax", MQ2Version);
 	WriteChatf(PLUGINMSG "\ay/autoaccept \ao::\aw Lists command syntax");
 	WriteChatf(PLUGINMSG "\ay/autoaccept \agon\aw|\aroff \ao::\aw Main accept toggle. Nothing else will accept if this is off. Default \ag*ON*\ax");
-	WriteChatf(PLUGINMSG "\ay/autoaccept \attranslocate always|trusted|never \ao::\aw Accept translocate/zephyr casts. Always = anyone, Trusted = only names on your list, Never = ignore. Default \ar*NEVER*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \attranslocate \agalways\aw|\aotrusted\aw|\arnever \ao::\aw Accept translocate/zephyr casts. Always = anyone, Trusted = only names on your list, Never = ignore. Default \ar*NEVER*\ax");
 	WriteChatf(PLUGINMSG "\ay/autoaccept \atanchor \agon\aw|\aroff \ao::\aw Toggle acceptance of primary/secondary real estate anchor port.  Default \ar*OFF*\ax");
 	WriteChatf(PLUGINMSG "\ay/autoaccept \atselfanchor \agon\aw|\aroff \ao::\aw Toggle acceptance of primary/secondary real estate anchor port when you cast it.  Default \ar*OFF*\ax");
 	WriteChatf(PLUGINMSG "\ay/autoaccept \attrade \agon\aw|\aroff \ao::\aw Toggle acceptance of trades by people on the auto accept list. Default \ag*ON*\ax");
