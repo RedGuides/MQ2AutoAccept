@@ -40,6 +40,7 @@ bool bGroup = true;
 bool bFellowship = true;
 bool bRaid = true;
 bool bInitDone = false;
+bool bAutoAcceptSettingsDirty = false;
 bool bTradeReject = false;
 bool bUseServerNames = false;
 
@@ -163,6 +164,7 @@ void SaveINI()
 		WritePrivateProfileString(strAnchors, szA, vRef, INIFileName);
 	}
 	WriteChatf(PLUGINMSG "\awSettings updated");
+	bAutoAcceptSettingsDirty = false;
 }
 
 void LoadINI()
@@ -300,6 +302,7 @@ void LoadINI()
 	// flag first load init as done
 
 	bInitDone = true;
+	bAutoAcceptSettingsDirty = false;
 }
 
 PLUGIN_API void SetGameState(const int GameState) {
@@ -335,6 +338,18 @@ void ShowHelp() {
 	WriteChatf(PLUGINMSG "\ay/autoaccept \ardelanchor \atVALUE \ao::\aw Delete VALUE from your valid anchor target list. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
 }
 
+bool ParseOnOff(const char* arg, bool& outValue) {
+	if (ci_equals(arg, "on")) {
+		outValue = true;
+		return true;
+	}
+	if (ci_equals(arg, "off")) {
+		outValue = false;
+		return true;
+	}
+	return false;
+}
+
 void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 	char szTemp[MAX_STRING] = { 0 };
 	GetArg(szTemp, zLine, 1);
@@ -362,13 +377,9 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		return;
 	}
 
-	if (ci_equals(szTemp, "on")) {
-		bAutoAccept = true;
-		WriteChatf(PLUGINMSG "\agEnabled\ax");
-	}
-	else if (ci_equals(szTemp, "off")) {
-		bAutoAccept = false;
-		WriteChatf(PLUGINMSG "\arDisabled\ax");
+	if (ParseOnOff(szTemp, bAutoAccept)) {
+		WriteChatf(PLUGINMSG "%s", bAutoAccept ? "\agEnabled\ax" : "\arDisabled\ax");
+		bAutoAcceptSettingsDirty = true;
 	}
 	else if (ci_equals(szTemp, "list")) {
 		ListUsers();
@@ -389,6 +400,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		}
 		vAnchors.push_back(szTemp);
 		WriteChatf(PLUGINMSG "Added \ay%s\ax to anchor list", szTemp);
+		bAutoAcceptSettingsDirty = true;
 	}
 	else if (ci_equals(szTemp, "add")) {
 		GetArg(szTemp, zLine, 2);
@@ -406,6 +418,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		vIniNames.push_back(szTemp);
 		CombineNames();
 		WriteChatf(PLUGINMSG "Added \ay%s\ax to name list", szTemp);
+		bAutoAcceptSettingsDirty = true;
 	}
 	else if (ci_equals(szTemp, "delanchor")) {
 		int delIndex = -1;
@@ -419,7 +432,9 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		if (delIndex >= 0) {
 			vAnchors.erase(vAnchors.begin() + delIndex);
 			WriteChatf(PLUGINMSG "Deleted anchor \ay%s\ax", szTemp);
-		} else {
+			bAutoAcceptSettingsDirty = true;
+		}
+		else {
 			WriteChatf(PLUGINMSG "Anchor \ay%s\ax not found", szTemp);
 		}
 	}
@@ -433,77 +448,63 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 			}
 		}
 		if (delIndex >= 0) {
-			CombineNames();;
 			vIniNames.erase(vIniNames.begin() + delIndex);
+			CombineNames();
 			WriteChatf(PLUGINMSG "Deleted user \ay%s\ax", szTemp);
-		} else {
+			bAutoAcceptSettingsDirty = true;
+		}
+		else {
 			WriteChatf(PLUGINMSG "User \ay%s\ax not found", szTemp);
 		}
 	}
 	else if (ci_equals(szTemp, "selfanchor")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on")) {
-			bSelfAnchor = true;
-		} else if (ci_equals(szTemp, "off")) {
-			bSelfAnchor = false;
+		if (ParseOnOff(szTemp, bSelfAnchor)) {
+			bAutoAcceptSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "anchor")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on")) {
-			bAnchor = true;
-		} else if (ci_equals(szTemp, "off")) {
-			bAnchor = false;
+		if (ParseOnOff(szTemp, bAnchor)) {
+			bAutoAcceptSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "group")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on")) {
-			bGroup = true;
-		} else if (ci_equals(szTemp, "off")) {
-			bGroup = false;
+		if (ParseOnOff(szTemp, bGroup)) {
+			bAutoAcceptSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "fellowship")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on")) {
-			bFellowship = true;
-		} else if (ci_equals(szTemp, "off")) {
-			bFellowship = false;
+		if (ParseOnOff(szTemp, bFellowship)) {
+			bAutoAcceptSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "raid")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on")) {
-			bRaid = true;
-		} else if (ci_equals(szTemp, "off")) {
-			bRaid = false;
+		if (ParseOnOff(szTemp, bRaid)) {
+			bAutoAcceptSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "trade")) {
 		GetArg(szTemp, zLine, 2);
-		if (ci_equals(szTemp, "on")) {
-			bTrade = true;
-		} else if (ci_equals(szTemp, "off")) {
-			bTrade = false;
-			bTradeAlways = false;
-		}
-		else if (ci_equals(szTemp, "reject")) {
+		if (ci_equals(szTemp, "reject")) {
 			GetArg(szTemp, zLine, 3);
 			if (szTemp[0] == '\0') {
 				WriteChatf(PLUGINMSG "Usage: /autoaccept trade reject on|off");
 				return;
 			}
-			if (ci_equals(szTemp, "on")) {
-				bTrade = true;
-				bTradeReject = true;
-			} else if (ci_equals(szTemp, "off")) {
-				bTradeReject = false;
+			if (ParseOnOff(szTemp, bTradeReject)) {
+				if (bTradeReject) {
+					bTrade = true;
+				}
+				bAutoAcceptSettingsDirty = true;
 			}
 			WriteChatf(PLUGINMSG "Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
 			return;
@@ -514,14 +515,20 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 				WriteChatf(PLUGINMSG "Usage: /autoaccept trade always on|off");
 				return;
 			}
-			if (ci_equals(szTemp, "on")) {
-				bTrade = true;
-				bTradeAlways = true;
-			} else if (ci_equals(szTemp, "off")) {
-				bTradeAlways = false;
+			if (ParseOnOff(szTemp, bTradeAlways)) {
+				if (bTradeAlways) {
+					bTrade = true;
+				}
+				bAutoAcceptSettingsDirty = true;
 			}
 			WriteChatf(PLUGINMSG "Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
 			return;
+		}
+		else if (ParseOnOff(szTemp, bTrade)) {
+			if (!bTrade) {
+				bTradeAlways = false;
+			}
+			bAutoAcceptSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
 	}
@@ -532,6 +539,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		}
 		else {
 			translocateMode = AcceptModeFromString(szTemp, translocateMode);
+			bAutoAcceptSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "\agTranslocate accept is \ax\at%s\ax", AcceptModeToString(translocateMode));
 	}
