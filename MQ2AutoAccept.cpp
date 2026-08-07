@@ -168,8 +168,7 @@ void SaveINI()
 void LoadINI()
 {
 	// get on/off settings
-	PCHARINFO pChar = GetCharInfo();
-	if (!pChar)
+	if (!pLocalPC)
 		return;
 
 	bUseServerNames = GetPrivateProfileBool("General", "UseServerNames", bUseServerNames, INIFileName);
