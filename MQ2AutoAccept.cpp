@@ -393,7 +393,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		}
 		for (unsigned int a = 0; a < vAnchors.size(); a++) {
 			std::string& vRef = vAnchors[a];
-			if (!_strcmpi(szTemp, vRef.c_str())) {
+			if (ci_equals(szTemp, vRef.c_str())) {
 				WriteChatf(PLUGINMSG "Anchor \ay%s\ax already exists", szTemp);
 				return;
 			}
@@ -410,7 +410,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		}
 		for (unsigned int a = 0; a < vIniNames.size(); a++) {
 			std::string& vRef = vIniNames[a];
-			if (!_strcmpi(szTemp, vRef.c_str())) {
+			if (ci_equals(szTemp, vRef.c_str())) {
 				WriteChatf(PLUGINMSG "User \ay%s\ax already exists", szTemp);
 				return;
 			}
@@ -425,7 +425,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		GetArg(szTemp, zLine, 2);
 		for (unsigned int a = 0; a < vAnchors.size(); a++) {
 			std::string& vRef = vAnchors[a];
-			if (!_strcmpi(szTemp, vRef.c_str())) {
+			if (ci_equals(szTemp, vRef.c_str())) {
 				delIndex = a;
 			}
 		}
@@ -443,7 +443,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		GetArg(szTemp, zLine, 2);
 		for (unsigned int a = 0; a < vIniNames.size(); a++) {
 			std::string& vRef = vIniNames[a];
-			if (!_strcmpi(szTemp, vRef.c_str())) {
+			if (ci_equals(szTemp, vRef.c_str())) {
 				delIndex = a;
 			}
 		}
@@ -578,7 +578,7 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			// loop through user list and find a match for inviter. If found join group
 			for (auto& vRef : vNames)
 			{
-				if (!_strcmpi(szName, vRef.c_str())) {
+				if (ci_equals(szName, vRef.c_str())) {
 					DoCommand(pLocalPC->pSpawn, "/timed 3s /invite");
 					WriteChatf(PLUGINMSG "\agJoining group with %s\ax", szName);
 				}
@@ -589,7 +589,7 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			// loop through user list and find a match for inviter. If found join group
 			for (auto& vRef : vNames)
 			{
-				if (!_strcmpi(szName, vRef.c_str())) {
+				if (ci_equals(szName, vRef.c_str())) {
 					DoCommand(pLocalPC->pSpawn, "/timed 3s /invite");
 					WriteChatf(PLUGINMSG "\agJoining fellowship with %s\ax", szName);
 				}
@@ -600,7 +600,7 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			// loop through user list and find a match for inviter. If found join raid
 			for (auto& vRef : vNames)
 			{
-				if (!_strcmpi(szName, vRef.c_str())) {
+				if (ci_equals(szName, vRef.c_str())) {
 					DoCommand(pLocalPC->pSpawn, "/timed 3s /raidaccept");
 					WriteChatf(PLUGINMSG "\agJoining raid with %s\ax", szName);
 				}
