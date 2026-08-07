@@ -12,6 +12,7 @@
 // v2.12 - Sym - 08-07-2017 - Added wizard translocate and druid zephyr casts to translocate toggle. Previously it was translocate to bind only.
 // v2.13 - Eqmule - 06-04-2018 - Fixed a null ptr crash and added a check for a rez message so it wont accept that, its not this plugins job to accept rezzes.
 #include <mq/Plugin.h>
+#include "mq/imgui/ImGuiUtils.h"
 
 PreSetup("MQ2AutoAccept");
 PLUGIN_VERSION(2.13);
@@ -381,6 +382,10 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		WriteChatf(PLUGINMSG "%s", bAutoAccept ? "\agEnabled\ax" : "\arDisabled\ax");
 		bAutoAcceptSettingsDirty = true;
 	}
+	else if (ci_equals(szTemp, "gui") || ci_equals(szTemp, "ui"))
+	{
+		DoCommand("/mqsettings plugins/autosize");
+	}
 	else if (ci_equals(szTemp, "list")) {
 		ListUsers();
 		ListAnchors();
@@ -548,17 +553,397 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 	}
 }
 
+bool AddTrustedName(const char* name)
+{
+	if (!name || name[0] == '\0')
+	{
+		return false;
+	}
+
+	for (const std::string& vRef : vIniNames)
+	{
+		if (ci_equals(name, vRef.c_str()))
+		{
+			return false;
+		}
+	}
+
+	vIniNames.emplace_back(name);
+	return true;
+}
+
+void AddGroupToTrustedNames()
+{
+	bool addedAny = false;
+
+	if (pLocalPC && pLocalPC->Group)
+	{
+		for (int i = 0; i < MAX_GROUP_SIZE; ++i)
+		{
+			CGroupMember* pMember = pLocalPC->Group->GetGroupMember(i);
+			if (pMember && pMember->pSpawn)
+			{
+				if (AddTrustedName(pMember->pSpawn->Name))
+				{
+					addedAny = true;
+				}
+			}
+		}
+	}
+
+	if (addedAny)
+	{
+		CombineNames();
+		bAutoAcceptSettingsDirty = true;
+	}
+}
+
+void AddRaidToTrustedNames()
+{
+	bool addedAny = false;
+
+	if (pRaid)
+	{
+		for (int i = 0; i < MAX_RAID_SIZE; ++i)
+		{
+			if (!pRaid->locations[i])
+				continue;
+
+			PlayerClient* thisMember = GetSpawnByName(pRaid->raidMembers[i].Name);
+			if (!thisMember)
+			{
+				continue;
+			}
+
+			if (AddTrustedName(thisMember->Name))
+			{
+				addedAny = true;
+			}
+		}
+	}
+
+	if (addedAny)
+	{
+		CombineNames();
+		bAutoAcceptSettingsDirty = true;
+	}
+}
+
+static void DrawDoubleClickHint()
+{
+	float originalSize = ImGui::GetStyle().FontSizeBase;
+	float smallSize = originalSize * 0.80f;
+	float columnWidth = ImGui::GetColumnWidth();
+	const char* dblClickHint = "Double click to delete an entry from the list.";
+	ImGui::PushFont(nullptr, smallSize);
+	ImVec2 textSize = ImGui::CalcTextSize(dblClickHint);
+	float offset = (columnWidth - textSize.x) * 0.5f;
+	if (offset > 0.0f)
+	{
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+	}
+	ImGui::TextUnformatted(dblClickHint);
+	ImGui::PopFont();
+}
+
+void AutoAcceptImGuiSettingsPanel()
+{
+	ImGui::BeginDisabled(!bAutoAcceptSettingsDirty);
+	if (ImGui::Button("Save"))
+	{
+		SaveINI();
+		bAutoAcceptSettingsDirty = false;
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Changes below are not saved automatically. Click Save to write them to the ini.");
+	if (bAutoAcceptSettingsDirty)
+	{
+		ImGui::SameLine();
+		ImGui::TextDisabled("(unsaved changes)");
+	}
+
+	ImGui::Separator();
+
+	if (ImGui::Checkbox("Enabled", &bAutoAccept))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Main accept toggle. Nothing else will accept if this is off.\n\nINI Setting: Enabled");
+
+	if (ImGui::Checkbox("Use server name prefix", &bUseServerNames))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Store settings/names/anchors per-server as well as per-character.\n\nINI Setting: General/UseServerNames");
+
+	ImGui::Separator();
+
+	if (ImGui::Checkbox("Group invites", &bGroup))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept group invites from people on your list.\n\nINI Setting: Group");
+
+	if (ImGui::Checkbox("Fellowship invites", &bFellowship))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept fellowship invites from people on your list.\n\nINI Setting: Fellowship");
+
+	if (ImGui::Checkbox("Raid invites", &bRaid))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept raid invites from people on your list.\n\nINI Setting: Raid");
+
+	ImGui::Separator();
+
+	if (ImGui::Checkbox("Anchor portal", &bAnchor))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept real estate anchor ports to destinations on your anchor list.\n\nINI Setting: Anchor");
+
+	if (ImGui::Checkbox("Self anchor portal", &bSelfAnchor))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept the primary/secondary real estate anchor port when you cast it yourself.\n\nINI Setting: SelfAnchor");
+
+	ImGui::Separator();
+
+	if (ImGui::Checkbox("Trade", &bTrade))
+	{
+		if (!bTrade)
+		{
+			bTradeAlways = false;
+		}
+
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept trades from people on your list.\n\nINI Setting: Trade");
+
+	ImGui::BeginDisabled(!bTrade);
+	ImGui::Indent();
+
+	if (ImGui::Checkbox("Always accept trades", &bTradeAlways))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept trades from anyone, not just people on your list.\n\nINI Setting: TradeAlways");
+
+	if (ImGui::Checkbox("Reject trades after 5s if not on list", &bTradeReject))
+	{
+		bAutoAcceptSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Cancel trades from people not on your list after 5 seconds.\n\nINI Setting: TradeReject");
+
+	ImGui::Unindent();
+	ImGui::EndDisabled();
+
+	ImGui::Separator();
+
+	constexpr int iInputWidth = 150;
+	static const char* translocateOptions[] = { "Never", "Trusted", "Always" };
+
+	int currentMode = static_cast<int>(translocateMode);
+	ImGui::TextUnformatted("Accept translocate/zephyr casts:");
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Always = accept from anyone. Trusted = only accept from people on your list. Never = ignore.\n\nINI Setting: Translocate");
+	ImGui::SetNextItemWidth(iInputWidth);
+	if (ImGui::Combo("##TranslocateMode", &currentMode, translocateOptions, IM_ARRAYSIZE(translocateOptions)))
+	{
+		translocateMode = static_cast<eAcceptMode>(currentMode);
+		bAutoAcceptSettingsDirty = true;
+	}
+
+	ImGui::Separator();
+
+	if (ImGui::BeginTabBar("##AutoAcceptListsTabBar"))
+	{
+		if (ImGui::BeginTabItem("Trusted Names"))
+		{
+			static char szNewName[MAX_STRING] = { 0 };
+			mq::imgui::HelpMarker("People on this list are auto-accepted for group/fellowship/raid invites, trusted translocates, and trades.\nGlobal_Names entries from the ini are not shown/editable here.");
+			ImGui::SameLine();
+			ImGui::TextUnformatted("Trusted Names");
+
+			if (ImGui::Button("Add Group"))
+			{
+				AddGroupToTrustedNames();
+			}
+			ImGui::SameLine();
+			mq::imgui::HelpMarker("Adds every current group member (including yourself) to the trusted names list.");
+
+			ImGui::SameLine();
+			if (ImGui::Button("Add Raid"))
+			{
+				AddRaidToTrustedNames();
+			}
+			ImGui::SameLine();
+			mq::imgui::HelpMarker("Adds every current raid member to the trusted names list.");
+
+			ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.45f);
+			bool submitName = ImGui::InputText("##NewName", szNewName, IM_ARRAYSIZE(szNewName), ImGuiInputTextFlags_EnterReturnsTrue);
+			ImGui::SameLine();
+			if ((ImGui::Button("Add##AddName") || submitName) && szNewName[0] != '\0')
+			{
+				bool exists = false;
+				for (const std::string& vRef : vIniNames)
+				{
+					if (ci_equals(szNewName, vRef.c_str()))
+					{
+						exists = true;
+						break;
+					}
+				}
+
+				if (!exists)
+				{
+					vIniNames.emplace_back(szNewName);
+					CombineNames();
+					bAutoAcceptSettingsDirty = true;
+				}
+
+				szNewName[0] = '\0';
+			}
+
+			DrawDoubleClickHint();
+
+			if (ImGui::BeginTable("##AutoAcceptNameList", 1, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY, ImVec2(0, 150)))
+			{
+				ImGui::TableSetupColumn("Name");
+				ImGui::TableSetupScrollFreeze(0, 1);
+				ImGui::TableHeadersRow();
+
+				for (const std::string& name : vIniNames)
+				{
+					ImGui::PushID(name.c_str());
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(name.c_str());
+
+					// double click to remove
+					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+					{
+						auto it = std::find_if(vIniNames.begin(), vIniNames.end(),
+							[&name](const std::string& vRef) { return ci_equals(name.c_str(), vRef.c_str()); });
+						if (it != vIniNames.end())
+						{
+							vIniNames.erase(it);
+							CombineNames();
+							bAutoAcceptSettingsDirty = true;
+						}
+					}
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+
+
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Anchor Destinations"))
+		{
+			static char szNewAnchor[MAX_STRING] = { 0 };
+			mq::imgui::HelpMarker("Real estate anchor destinations that are auto-accepted when \"Anchor portal\" is on.\nUse the exact address as it appears in the portal confirmation dialog, e.g.\n\"Willow Circle Bay, 100 Vanward Heights\"");
+			ImGui::SameLine();
+			ImGui::TextUnformatted("Anchor Destinations");
+
+			ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.45f);
+			bool submitAnchor = ImGui::InputText("##NewAnchor", szNewAnchor, IM_ARRAYSIZE(szNewAnchor), ImGuiInputTextFlags_EnterReturnsTrue);
+			ImGui::SameLine();
+			if ((ImGui::Button("Add##AddAnchor") || submitAnchor) && szNewAnchor[0] != '\0')
+			{
+				bool exists = false;
+				for (const std::string& vRef : vAnchors)
+				{
+					if (ci_equals(szNewAnchor, vRef.c_str()))
+					{
+						exists = true;
+						break;
+					}
+				}
+
+				if (!exists)
+				{
+					vAnchors.emplace_back(szNewAnchor);
+					bAutoAcceptSettingsDirty = true;
+				}
+
+				szNewAnchor[0] = '\0';
+			}
+
+			DrawDoubleClickHint();
+
+			if (ImGui::BeginTable("##AutoAcceptAnchorList", 1, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY, ImVec2(0, 150)))
+			{
+				ImGui::TableSetupColumn("Anchor");
+				ImGui::TableSetupScrollFreeze(0, 1);
+				ImGui::TableHeadersRow();
+
+				for (const std::string& anchor : vAnchors)
+				{
+					ImGui::PushID(anchor.c_str());
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(anchor.c_str());
+
+					// double click to remove
+					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+					{
+						auto it = std::find_if(vAnchors.begin(), vAnchors.end(),
+							[&anchor](const std::string& vRef) { return ci_equals(anchor.c_str(), vRef.c_str()); });
+						if (it != vAnchors.end())
+						{
+							vAnchors.erase(it);
+							bAutoAcceptSettingsDirty = true;
+						}
+					}
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+
+			DrawDoubleClickHint();
+
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
+	}
+}
 
 // Called once, when the plugin is to initialize
 PLUGIN_API void InitializePlugin() {
 	DebugSpewAlways("Initializing MQ2AutoAccept");
 	AddCommand("/autoaccept", AutoAcceptCommand);
+
+	AddSettingsPanel("plugins/AutoAccept", AutoAcceptImGuiSettingsPanel);
 }
 
 // Called once, when the plugin is to shutdown
 PLUGIN_API void ShutdownPlugin() {
 	DebugSpewAlways("Shutting down MQ2AutoAccept");
 	RemoveCommand("/autoaccept");
+
+	RemoveSettingsPanel("plugins/AutoAccept");
 }
 
 // TODO: This signature should be const char* but need to fix use of GetArg below.
