@@ -89,7 +89,7 @@ void CombineNames() {
 	}
 }
 
-bool WindowOpen(PCHAR WindowName) {
+bool WindowOpen(const char* WindowName) {
 	const auto pWnd = dynamic_cast<CSidlScreenWnd*>(FindMQ2Window(WindowName));
 	return pWnd && pWnd->IsVisible();
 }
@@ -110,7 +110,7 @@ void ListAnchors() {
 	}
 }
 
-std::string GetPrefix(bool UseServerNames)
+std::string GetPrefix(const bool UseServerNames)
 {
 	std::string Prefix = "unknown";
 	if (pLocalPC)
@@ -302,7 +302,7 @@ void LoadINI()
 	bInitDone = true;
 }
 
-PLUGIN_API void SetGameState(int GameState) {
+PLUGIN_API void SetGameState(const int GameState) {
 	if (GameState==GAMESTATE_INGAME) {
 		if (!bInitDone)
 			LoadINI();
@@ -335,7 +335,7 @@ void ShowHelp() {
 	WriteChatf("/autoaccept delanchor VALUE :: Delete VALUE from your valid anchor target list. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
 }
 
-void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
+void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 	char szTemp[MAX_STRING] = { 0 };
 	GetArg(szTemp, zLine, 1);
 
@@ -554,14 +554,13 @@ PLUGIN_API void ShutdownPlugin() {
 }
 
 // TODO: This signature should be const char* but need to fix use of GetArg below.
-PLUGIN_API bool OnIncomingChat(PCHAR Line, DWORD Color)
+PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 {
 	// No users, abort
 	if (vNames.empty())
 		return false;
 
-	PCHARINFO pChar = GetCharInfo();
-	if (!pChar)
+	if (!pLocalPC)
 		return false;
 
 	if (bAutoAccept) {
@@ -572,7 +571,7 @@ PLUGIN_API bool OnIncomingChat(PCHAR Line, DWORD Color)
 			for (auto& vRef : vNames)
 			{
 				if (!_strcmpi(szName, vRef.c_str())) {
-					DoCommand(pChar->pSpawn, "/timed 3s /invite");
+					DoCommand(pLocalPC->pSpawn, "/timed 3s /invite");
 					WriteChatf("\agMQ2AutoAccept :: Joining group with %s\ax", szName);
 				}
 			}
@@ -583,7 +582,7 @@ PLUGIN_API bool OnIncomingChat(PCHAR Line, DWORD Color)
 			for (auto& vRef : vNames)
 			{
 				if (!_strcmpi(szName, vRef.c_str())) {
-					DoCommand(pChar->pSpawn, "/timed 3s /invite");
+					DoCommand(pLocalPC->pSpawn, "/timed 3s /invite");
 					WriteChatf("\agMQ2AutoAccept :: Joining fellowship with %s\ax", szName);
 				}
 			}
@@ -594,7 +593,7 @@ PLUGIN_API bool OnIncomingChat(PCHAR Line, DWORD Color)
 			for (auto& vRef : vNames)
 			{
 				if (!_strcmpi(szName, vRef.c_str())) {
-					DoCommand(pChar->pSpawn, "/timed 3s /raidaccept");
+					DoCommand(pLocalPC->pSpawn, "/timed 3s /raidaccept");
 					WriteChatf("\agMQ2AutoAccept :: Joining raid with %s\ax", szName);
 				}
 			}
