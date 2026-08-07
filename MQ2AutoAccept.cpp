@@ -100,7 +100,7 @@ bool WindowOpen(const char* WindowName)
 }
 
 void ListUsers() {
-	WriteChatf(PLUGINMSG "User list contains \ay%d\ax %s", vNames.size(), vNames.size() > 1 ? "entries" : "entry");
+	WriteChatf(PLUGINMSG "User list contains \ay%d\ax %s", static_cast<int>(vNames.size()), vNames.size() > 1 ? "entries" : "entry");
 	for (unsigned int a = 0; a < vNames.size(); a++) {
 		std::string& vRef = vNames[a];
 		WriteChatf(PLUGINMSG "\at%d: %s\ax", a+1, vRef.c_str());
@@ -108,7 +108,7 @@ void ListUsers() {
 }
 
 void ListAnchors() {
-	WriteChatf(PLUGINMSG "Anchor list contains \ay%d\ax %s", vAnchors.size(), vAnchors.size() > 1 ? "entries" : "entry");
+	WriteChatf(PLUGINMSG "Anchor list contains \ay%d\ax %s", static_cast<int>(vAnchors.size()), vAnchors.size() > 1 ? "entries" : "entry");
 	for (unsigned int a = 0; a < vAnchors.size(); a++) {
 		std::string& vRef = vAnchors[a];
 		WriteChatf(PLUGINMSG "\at%d: %s\ax", a+1, vRef.c_str());
@@ -309,12 +309,18 @@ void LoadINI()
 }
 
 PLUGIN_API void SetGameState(const int GameState) {
-	if (GameState==GAMESTATE_INGAME) {
+	if (GameState == GAMESTATE_INGAME) {
 		if (!bInitDone)
+		{
 			LoadINI();
-	} else if (GameState!=GAMESTATE_LOGGINGIN) {
+		}
+	}
+	else if (GameState != GAMESTATE_LOGGINGIN)
+	{
 		if (bInitDone)
-			bInitDone=false;
+		{
+			bInitDone = false;
+		}
 	}
 }
 
@@ -341,7 +347,8 @@ void ShowHelp() {
 	WriteChatf(PLUGINMSG "\ay/autoaccept \ardelanchor \atVALUE \ao::\aw Delete VALUE from your valid anchor target list. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
 }
 
-bool ParseOnOff(const char* arg, bool& outValue) {
+bool ParseOnOff(const char* arg, bool& outValue)
+{
 	if (ci_equals(arg, "on")) {
 		outValue = true;
 		return true;
@@ -361,6 +368,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		LoadINI();
 		return;
 	}
+
 	if (ci_equals(szTemp, "save")) {
 		SaveINI();
 		return;
@@ -400,7 +408,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		}
 		for (unsigned int a = 0; a < vAnchors.size(); a++) {
 			std::string& vRef = vAnchors[a];
-			if (ci_equals(szTemp, vRef.c_str())) {
+			if (ci_equals(szTemp, vRef)) {
 				WriteChatf(PLUGINMSG "Anchor \ay%s\ax already exists", szTemp);
 				return;
 			}
@@ -417,7 +425,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		}
 		for (unsigned int a = 0; a < vIniNames.size(); a++) {
 			std::string& vRef = vIniNames[a];
-			if (ci_equals(szTemp, vRef.c_str())) {
+			if (ci_equals(szTemp, vRef)) {
 				WriteChatf(PLUGINMSG "User \ay%s\ax already exists", szTemp);
 				return;
 			}
@@ -432,7 +440,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		GetArg(szTemp, zLine, 2);
 		for (unsigned int a = 0; a < vAnchors.size(); a++) {
 			std::string& vRef = vAnchors[a];
-			if (ci_equals(szTemp, vRef.c_str())) {
+			if (ci_equals(szTemp, vRef)) {
 				delIndex = a;
 			}
 		}
@@ -450,7 +458,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		GetArg(szTemp, zLine, 2);
 		for (unsigned int a = 0; a < vIniNames.size(); a++) {
 			std::string& vRef = vIniNames[a];
-			if (ci_equals(szTemp, vRef.c_str())) {
+			if (ci_equals(szTemp, vRef)) {
 				delIndex = a;
 			}
 		}
@@ -555,16 +563,16 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 	}
 }
 
-bool AddTrustedName(const char* name)
+bool AddTrustedName(const std::string_view name)
 {
-	if (!name || name[0] == '\0')
+	if (!name.empty())
 	{
 		return false;
 	}
 
 	for (const std::string& vRef : vIniNames)
 	{
-		if (ci_equals(name, vRef.c_str()))
+		if (ci_equals(name, vRef))
 		{
 			return false;
 		}
@@ -837,10 +845,10 @@ void AutoAcceptImGuiSettingsPanel()
 					ImGui::TextUnformatted(name.c_str());
 
 					// double click to remove
-					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 					{
 						auto it = std::find_if(vIniNames.begin(), vIniNames.end(),
-							[&name](const std::string& vRef) { return ci_equals(name.c_str(), vRef.c_str()); });
+							[&name](const std::string& vRef) { return ci_equals(name, vRef); });
 						if (it != vIniNames.end())
 						{
 							vIniNames.erase(it);
@@ -874,7 +882,7 @@ void AutoAcceptImGuiSettingsPanel()
 				bool exists = false;
 				for (const std::string& vRef : vAnchors)
 				{
-					if (ci_equals(szNewAnchor, vRef.c_str()))
+					if (ci_equals(szNewAnchor, vRef))
 					{
 						exists = true;
 						break;
@@ -906,10 +914,10 @@ void AutoAcceptImGuiSettingsPanel()
 					ImGui::TextUnformatted(anchor.c_str());
 
 					// double click to remove
-					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0))
+					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 					{
 						auto it = std::find_if(vAnchors.begin(), vAnchors.end(),
-							[&anchor](const std::string& vRef) { return ci_equals(anchor.c_str(), vRef.c_str()); });
+							[&anchor](const std::string& vRef) { return ci_equals(anchor, vRef); });
 						if (it != vAnchors.end())
 						{
 							vAnchors.erase(it);
@@ -965,8 +973,8 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			// loop through user list and find a match for inviter. If found join group
 			for (auto& vRef : vNames)
 			{
-				if (ci_equals(szName, vRef.c_str())) {
-					DoCommand(pLocalPC->pSpawn, "/timed 3s /invite");
+				if (ci_equals(szName, vRef)) {
+					DoCommand("/timed 3s /invite");
 					WriteChatf(PLUGINMSG "\agJoining group with %s\ax", szName);
 				}
 			}
@@ -977,7 +985,7 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			for (auto& vRef : vNames)
 			{
 				if (ci_equals(szName, vRef)) {
-					DoCommand(pLocalPC->pSpawn, "/timed 3s /invite");
+					DoCommand("/timed 3s /invite");
 					WriteChatf(PLUGINMSG "\agJoining fellowship with %s\ax", szName);
 				}
 			}
@@ -988,7 +996,7 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			for (auto& vRef : vNames)
 			{
 				if (ci_equals(szName, vRef)) {
-					DoCommand(pLocalPC->pSpawn, "/timed 3s /raidaccept");
+					DoCommand("/timed 3s /raidaccept");
 					WriteChatf(PLUGINMSG "\agJoining raid with %s\ax", szName);
 				}
 			}
@@ -1152,7 +1160,7 @@ PLUGIN_API void OnPulse()
 					for (auto& vRef : vAnchors)
 					{
 						if (ci_find_substr(windowText, vRef) != -1) {
-							WriteChatf(PLUGINMSG "\agAccepting anchor portal to \ax\at%s\ax", vRef.c_str());
+							WriteChatf(PLUGINMSG "\agAccepting anchor portal to \ax\at%s\ax", vRef);
 							WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
 							return;
 						}
