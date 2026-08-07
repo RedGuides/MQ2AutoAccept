@@ -32,7 +32,7 @@ enum class eAcceptMode : int {
 	Trusted = 1,
 	Always = 2,
 };
-eAcceptMode translocateMode = eAcceptMode::Never; // was: bool bTranslocate = false;
+eAcceptMode translocateMode = eAcceptMode::Never;
 bool bAnchor = false;
 bool bSelfAnchor = false;
 bool bTrade = true;
@@ -41,11 +41,12 @@ bool bGroup = true;
 bool bFellowship = true;
 bool bRaid = true;
 bool bInitDone = false;
-bool bAutoAcceptSettingsDirty = false;
+bool bSettingsDirty = false;
 bool bTradeReject = false;
 bool bUseServerNames = false;
 
-const char* AcceptModeToString(eAcceptMode mode) {
+const char* AcceptModeToString(eAcceptMode mode)
+{
 	switch (mode) {
 		case eAcceptMode::Always: {
 			return "Always";
@@ -59,7 +60,7 @@ const char* AcceptModeToString(eAcceptMode mode) {
 	}
 }
 
-eAcceptMode AcceptModeFromString(const std::string& str, eAcceptMode fallback = eAcceptMode::Never) {
+eAcceptMode AcceptModeFromString(const std::string_view str, eAcceptMode fallback = eAcceptMode::Never) {
 	// on/1 for legacy compatability
 	if (ci_equals(str, "always") || ci_equals(str, "on") || ci_equals(str, "1")) {
 		return eAcceptMode::Always;
@@ -92,7 +93,8 @@ void CombineNames() {
 	}
 }
 
-bool WindowOpen(const char* WindowName) {
+bool WindowOpen(const char* WindowName)
+{
 	const auto pWnd = dynamic_cast<CSidlScreenWnd*>(FindMQ2Window(WindowName));
 	return pWnd && pWnd->IsVisible();
 }
@@ -165,7 +167,7 @@ void SaveINI()
 		WritePrivateProfileString(strAnchors, szA, vRef, INIFileName);
 	}
 	WriteChatf(PLUGINMSG "\awSettings updated");
-	bAutoAcceptSettingsDirty = false;
+	bSettingsDirty = false;
 }
 
 void LoadINI()
@@ -303,7 +305,7 @@ void LoadINI()
 	// flag first load init as done
 
 	bInitDone = true;
-	bAutoAcceptSettingsDirty = false;
+	bSettingsDirty = false;
 }
 
 PLUGIN_API void SetGameState(const int GameState) {
@@ -380,7 +382,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 
 	if (ParseOnOff(szTemp, bAutoAccept)) {
 		WriteChatf(PLUGINMSG "%s", bAutoAccept ? "\agEnabled\ax" : "\arDisabled\ax");
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	else if (ci_equals(szTemp, "gui") || ci_equals(szTemp, "ui"))
 	{
@@ -405,7 +407,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		}
 		vAnchors.push_back(szTemp);
 		WriteChatf(PLUGINMSG "Added \ay%s\ax to anchor list", szTemp);
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	else if (ci_equals(szTemp, "add")) {
 		GetArg(szTemp, zLine, 2);
@@ -423,7 +425,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		vIniNames.push_back(szTemp);
 		CombineNames();
 		WriteChatf(PLUGINMSG "Added \ay%s\ax to name list", szTemp);
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	else if (ci_equals(szTemp, "delanchor")) {
 		int delIndex = -1;
@@ -437,7 +439,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		if (delIndex >= 0) {
 			vAnchors.erase(vAnchors.begin() + delIndex);
 			WriteChatf(PLUGINMSG "Deleted anchor \ay%s\ax", szTemp);
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		else {
 			WriteChatf(PLUGINMSG "Anchor \ay%s\ax not found", szTemp);
@@ -456,7 +458,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 			vIniNames.erase(vIniNames.begin() + delIndex);
 			CombineNames();
 			WriteChatf(PLUGINMSG "Deleted user \ay%s\ax", szTemp);
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		else {
 			WriteChatf(PLUGINMSG "User \ay%s\ax not found", szTemp);
@@ -465,35 +467,35 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 	else if (ci_equals(szTemp, "selfanchor")) {
 		GetArg(szTemp, zLine, 2);
 		if (ParseOnOff(szTemp, bSelfAnchor)) {
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "anchor")) {
 		GetArg(szTemp, zLine, 2);
 		if (ParseOnOff(szTemp, bAnchor)) {
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "group")) {
 		GetArg(szTemp, zLine, 2);
 		if (ParseOnOff(szTemp, bGroup)) {
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "fellowship")) {
 		GetArg(szTemp, zLine, 2);
 		if (ParseOnOff(szTemp, bFellowship)) {
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
 	}
 	else if (ci_equals(szTemp, "raid")) {
 		GetArg(szTemp, zLine, 2);
 		if (ParseOnOff(szTemp, bRaid)) {
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
 	}
@@ -509,7 +511,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 				if (bTradeReject) {
 					bTrade = true;
 				}
-				bAutoAcceptSettingsDirty = true;
+				bSettingsDirty = true;
 			}
 			WriteChatf(PLUGINMSG "Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
 			return;
@@ -524,7 +526,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 				if (bTradeAlways) {
 					bTrade = true;
 				}
-				bAutoAcceptSettingsDirty = true;
+				bSettingsDirty = true;
 			}
 			WriteChatf(PLUGINMSG "Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
 			return;
@@ -533,7 +535,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 			if (!bTrade) {
 				bTradeAlways = false;
 			}
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
 	}
@@ -544,7 +546,7 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine) {
 		}
 		else {
 			translocateMode = AcceptModeFromString(szTemp, translocateMode);
-			bAutoAcceptSettingsDirty = true;
+			bSettingsDirty = true;
 		}
 		WriteChatf(PLUGINMSG "\agTranslocate accept is \ax\at%s\ax", AcceptModeToString(translocateMode));
 	}
@@ -594,7 +596,7 @@ void AddGroupToTrustedNames()
 	if (addedAny)
 	{
 		CombineNames();
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 }
 
@@ -625,7 +627,7 @@ void AddRaidToTrustedNames()
 	if (addedAny)
 	{
 		CombineNames();
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 }
 
@@ -648,16 +650,16 @@ static void DrawDoubleClickHint()
 
 void AutoAcceptImGuiSettingsPanel()
 {
-	ImGui::BeginDisabled(!bAutoAcceptSettingsDirty);
+	ImGui::BeginDisabled(!bSettingsDirty);
 	if (ImGui::Button("Save"))
 	{
 		SaveINI();
-		bAutoAcceptSettingsDirty = false;
+		bSettingsDirty = false;
 	}
 	ImGui::EndDisabled();
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Changes below are not saved automatically. Click Save to write them to the ini.");
-	if (bAutoAcceptSettingsDirty)
+	if (bSettingsDirty)
 	{
 		ImGui::SameLine();
 		ImGui::TextDisabled("(unsaved changes)");
@@ -667,14 +669,14 @@ void AutoAcceptImGuiSettingsPanel()
 
 	if (ImGui::Checkbox("Enabled", &bAutoAccept))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Main accept toggle. Nothing else will accept if this is off.\n\nINI Setting: Enabled");
 
 	if (ImGui::Checkbox("Use server name prefix", &bUseServerNames))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Store settings/names/anchors per-server as well as per-character.\n\nINI Setting: General/UseServerNames");
@@ -683,21 +685,21 @@ void AutoAcceptImGuiSettingsPanel()
 
 	if (ImGui::Checkbox("Group invites", &bGroup))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Accept group invites from people on your list.\n\nINI Setting: Group");
 
 	if (ImGui::Checkbox("Fellowship invites", &bFellowship))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Accept fellowship invites from people on your list.\n\nINI Setting: Fellowship");
 
 	if (ImGui::Checkbox("Raid invites", &bRaid))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Accept raid invites from people on your list.\n\nINI Setting: Raid");
@@ -706,14 +708,14 @@ void AutoAcceptImGuiSettingsPanel()
 
 	if (ImGui::Checkbox("Anchor portal", &bAnchor))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Accept real estate anchor ports to destinations on your anchor list.\n\nINI Setting: Anchor");
 
 	if (ImGui::Checkbox("Self anchor portal", &bSelfAnchor))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Accept the primary/secondary real estate anchor port when you cast it yourself.\n\nINI Setting: SelfAnchor");
@@ -727,7 +729,7 @@ void AutoAcceptImGuiSettingsPanel()
 			bTradeAlways = false;
 		}
 
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Accept trades from people on your list.\n\nINI Setting: Trade");
@@ -737,14 +739,14 @@ void AutoAcceptImGuiSettingsPanel()
 
 	if (ImGui::Checkbox("Always accept trades", &bTradeAlways))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Accept trades from anyone, not just people on your list.\n\nINI Setting: TradeAlways");
 
 	if (ImGui::Checkbox("Reject trades after 5s if not on list", &bTradeReject))
 	{
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 	ImGui::SameLine();
 	mq::imgui::HelpMarker("Cancel trades from people not on your list after 5 seconds.\n\nINI Setting: TradeReject");
@@ -765,7 +767,7 @@ void AutoAcceptImGuiSettingsPanel()
 	if (ImGui::Combo("##TranslocateMode", &currentMode, translocateOptions, IM_ARRAYSIZE(translocateOptions)))
 	{
 		translocateMode = static_cast<eAcceptMode>(currentMode);
-		bAutoAcceptSettingsDirty = true;
+		bSettingsDirty = true;
 	}
 
 	ImGui::Separator();
@@ -813,7 +815,7 @@ void AutoAcceptImGuiSettingsPanel()
 				{
 					vIniNames.emplace_back(szNewName);
 					CombineNames();
-					bAutoAcceptSettingsDirty = true;
+					bSettingsDirty = true;
 				}
 
 				szNewName[0] = '\0';
@@ -843,7 +845,7 @@ void AutoAcceptImGuiSettingsPanel()
 						{
 							vIniNames.erase(it);
 							CombineNames();
-							bAutoAcceptSettingsDirty = true;
+							bSettingsDirty = true;
 						}
 					}
 
@@ -882,7 +884,7 @@ void AutoAcceptImGuiSettingsPanel()
 				if (!exists)
 				{
 					vAnchors.emplace_back(szNewAnchor);
-					bAutoAcceptSettingsDirty = true;
+					bSettingsDirty = true;
 				}
 
 				szNewAnchor[0] = '\0';
@@ -911,7 +913,7 @@ void AutoAcceptImGuiSettingsPanel()
 						if (it != vAnchors.end())
 						{
 							vAnchors.erase(it);
-							bAutoAcceptSettingsDirty = true;
+							bSettingsDirty = true;
 						}
 					}
 
@@ -974,7 +976,7 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			// loop through user list and find a match for inviter. If found join group
 			for (auto& vRef : vNames)
 			{
-				if (ci_equals(szName, vRef.c_str())) {
+				if (ci_equals(szName, vRef)) {
 					DoCommand(pLocalPC->pSpawn, "/timed 3s /invite");
 					WriteChatf(PLUGINMSG "\agJoining fellowship with %s\ax", szName);
 				}
@@ -985,7 +987,7 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			// loop through user list and find a match for inviter. If found join raid
 			for (auto& vRef : vNames)
 			{
-				if (ci_equals(szName, vRef.c_str())) {
+				if (ci_equals(szName, vRef)) {
 					DoCommand(pLocalPC->pSpawn, "/timed 3s /raidaccept");
 					WriteChatf(PLUGINMSG "\agJoining raid with %s\ax", szName);
 				}
@@ -1109,9 +1111,9 @@ PLUGIN_API void OnPulse()
 		}
 	}
 
-	CXWnd* pWnd=(CXWnd *)FindMQ2Window("ConfirmationDialogBox");
+	CXWnd* pWnd = (CXWnd *)FindMQ2Window("ConfirmationDialogBox");
 	if (pWnd && pWnd->IsVisible()) {
-		if (CXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
+		if (CXWnd* Child = pWnd->GetChildItem("CD_TextOutput")) {
 			CStmlWnd* cstm = (CStmlWnd*)Child;
 			CXStr windowText = cstm->STMLText;
 
@@ -1123,10 +1125,12 @@ PLUGIN_API void OnPulse()
 				ci_find_substr(windowText, "wish to be translocated by") != -1) {
 				// Translocate request
 				bool accept = false;
-				if (translocateMode == eAcceptMode::Always) {
+				if (translocateMode == eAcceptMode::Always)
+				{
 					accept = true;
 				}
-				else if (translocateMode == eAcceptMode::Trusted) {
+				else if (translocateMode == eAcceptMode::Trusted)
+				{
 					for (auto& vRef : vNames)
 					{
 						if (ci_find_substr(windowText, vRef + " ") != -1 || ci_find_substr(windowText, vRef + "'s") != -1) {
