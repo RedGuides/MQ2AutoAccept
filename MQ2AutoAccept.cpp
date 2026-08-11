@@ -95,7 +95,7 @@ void CombineNames() {
 
 bool WindowOpen(const char* WindowName)
 {
-	const auto pWnd = dynamic_cast<CSidlScreenWnd*>(FindMQ2Window(WindowName));
+	const auto pWnd = static_cast<CSidlScreenWnd*>(FindMQ2Window(WindowName));
 	return pWnd && pWnd->IsVisible();
 }
 
@@ -1128,7 +1128,7 @@ PLUGIN_API void OnPulse()
 		}
 	}
 
-	CXWnd* pWnd = (CXWnd *)FindMQ2Window("ConfirmationDialogBox");
+	CXWnd* pWnd = FindMQ2Window("ConfirmationDialogBox");
 	if (pWnd && pWnd->IsVisible()) {
 		if (CXWnd* Child = pWnd->GetChildItem("CD_TextOutput")) {
 			CStmlWnd* cstm = (CStmlWnd*)Child;
