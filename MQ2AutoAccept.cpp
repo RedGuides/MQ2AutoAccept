@@ -958,7 +958,12 @@ PLUGIN_API void ShutdownPlugin() {
 	RemoveSettingsPanel("plugins/AutoAccept");
 }
 
-// TODO: This signature should be const char* but need to fix use of GetArg below.
+bool IsInviter(std::string_view name)
+{
+	return std::find_if(vNames.begin(), vNames.end(),
+		[name](const std::string& key) { return ci_equals(name, key); }) != vNames.end();
+}
+
 PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 {
 	// No users, abort
@@ -970,41 +975,38 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 
 	if (bAutoAccept) {
 		char szName[MAX_STRING] = { 0 };
-		if (strstr(Line, "invites you to join a group.") && bGroup) {
+		// group invitations are done onpulse
+		// so here we will do fellowship and raid invitations
+		if (bFellowship && ci_find_substr(Line, "invites you to join a fellowship.") != -1) {
 			GetArg(szName, Line, 1);
-			// loop through user list and find a match for inviter. If found join group
-			for (auto& vRef : vNames)
-			{
-				if (ci_equals(szName, vRef)) {
-					DoCommand("/timed 3s /invite");
-					WriteChatf(PLUGINMSG "\agJoining group with %s\ax", szName);
-				}
+			if (IsInviter(szName)) {
+				DoCommand("/timed 3s /invite");
+				WriteChatf(PLUGINMSG "\agJoining fellowship with %s\ax", szName);
 			}
 		}
-		else if (strstr(Line, "invites you to join a fellowship.") && bFellowship) {
+		else if (bRaid && ci_find_substr(Line, "invites you to join a raid") != -1) {
 			GetArg(szName, Line, 1);
-			// loop through user list and find a match for inviter. If found join group
-			for (auto& vRef : vNames)
-			{
-				if (ci_equals(szName, vRef)) {
-					DoCommand("/timed 3s /invite");
-					WriteChatf(PLUGINMSG "\agJoining fellowship with %s\ax", szName);
-				}
-			}
-		}
-		else if (strstr(Line, "invites you to join a raid") && bRaid) {
-			GetArg(szName, Line, 1);
-			// loop through user list and find a match for inviter. If found join raid
-			for (auto& vRef : vNames)
-			{
-				if (ci_equals(szName, vRef)) {
-					DoCommand("/timed 3s /raidaccept");
-					WriteChatf(PLUGINMSG "\agJoining raid with %s\ax", szName);
-				}
+			if (IsInviter(szName)) {
+				DoCommand("/timed 3s /raidinvite");
+				WriteChatf(PLUGINMSG "\agJoining raid with %s\ax", szName);
 			}
 		}
 	}
 	return false;
+}
+
+void CheckAndAcceptGroupInvite()
+{
+	if (bAutoAccept && bGroup) {
+		if (pLocalPlayer && pLocalPlayer->InvitedToGroup)
+		{
+			const char* invitername = pEverQuestInfo->Inviter;
+			if (invitername[0] != '\0')
+			{
+				CheckForAndAcceptInvite(invitername, IsInviter(invitername), "group");
+			}
+		}
+	}
 }
 
 void WinClick(CXWnd* Wnd, const char* ScreenID, const char* ClickNotification, DWORD KeyState) {
@@ -1045,6 +1047,8 @@ PLUGIN_API void OnPulse()
 
 	bool clickTrade = false;
 	bool givingItem = false;
+
+	CheckAndAcceptGroupInvite();
 
 	// if we've clicked trade no need to check anything, let other person accept or reject
 	if (pTradeWnd && pTradeWnd->IsVisible() && !pTradeWnd->bMyReadyTrade) {
