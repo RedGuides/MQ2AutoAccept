@@ -617,7 +617,9 @@ void AddRaidToTrustedNames()
 		for (int i = 0; i < MAX_RAID_SIZE; ++i)
 		{
 			if (!pRaid->locations[i])
+			{
 				continue;
+			}
 
 			PlayerClient* thisMember = GetSpawnByName(pRaid->raidMembers[i].Name);
 			if (!thisMember)
@@ -1055,7 +1057,8 @@ PLUGIN_API void OnPulse()
 			CXStr theirName = pTradeWnd->HisNameLabel->GetText();
 			if (bTradeAlways) {
 				clickTrade = true;
-			} else {
+			}
+			else {
 				if (!theirName.empty()) {
 					for (auto& vRef : vNames)
 					{
@@ -1093,7 +1096,8 @@ PLUGIN_API void OnPulse()
 			if (givingItem || givingMoney) {
 				// We're giving item or coin, don't auto do anything
 				//DebugSpew("We're giving item or coin, don't do anything");
-			} else {
+			}
+			else {
 				if (clickTrade) {
 					if (!theirName.empty()) {
 						if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
@@ -1102,7 +1106,8 @@ PLUGIN_API void OnPulse()
 							pTarget = nullptr;
 						}
 					}
-				} else {
+				}
+				else {
 					if (bTradeReject) {
 						if (rejectTimer == 0)
 							rejectTimer = GetTickCount64() + 5000;
