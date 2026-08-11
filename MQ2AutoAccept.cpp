@@ -1003,7 +1003,10 @@ void CheckAndAcceptGroupInvite()
 			const char* invitername = pEverQuestInfo->Inviter;
 			if (invitername[0] != '\0')
 			{
-				CheckForAndAcceptInvite(invitername, IsInviter(invitername), "group");
+				if (IsInviter(invitername)) {
+					DoCommand("/timed 3s /invite");
+					WriteChatf(PLUGINMSG "\agJoining group with %s\ax", invitername);
+				}
 			}
 		}
 	}
@@ -1061,8 +1064,7 @@ PLUGIN_API void OnPulse()
 			CXStr theirName = pTradeWnd->HisNameLabel->GetText();
 			if (bTradeAlways) {
 				clickTrade = true;
-			}
-			else {
+			} else {
 				if (!theirName.empty()) {
 					for (auto& vRef : vNames)
 					{
@@ -1100,8 +1102,7 @@ PLUGIN_API void OnPulse()
 			if (givingItem || givingMoney) {
 				// We're giving item or coin, don't auto do anything
 				//DebugSpew("We're giving item or coin, don't do anything");
-			}
-			else {
+			} else {
 				if (clickTrade) {
 					if (!theirName.empty()) {
 						if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
@@ -1110,8 +1111,7 @@ PLUGIN_API void OnPulse()
 							pTarget = nullptr;
 						}
 					}
-				}
-				else {
+				} else {
 					if (bTradeReject) {
 						if (rejectTimer == 0)
 							rejectTimer = GetTickCount64() + 5000;
