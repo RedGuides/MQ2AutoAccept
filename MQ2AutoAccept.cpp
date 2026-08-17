@@ -184,7 +184,9 @@ void LoadINI()
 {
 	// get on/off settings
 	if (!pLocalPC)
+	{
 		return;
+	}
 
 	bUseServerNames = GetPrivateProfileBool("General", "UseServerNames", bUseServerNames, INIFileName);
 
@@ -274,7 +276,9 @@ void LoadINI()
 	// if we have entries show them
 	CombineNames();
 	if (vNames.size())
+	{
 		ListUsers();
+	}
 
 	// get all anchors
 	std::string strAnchors = Prefix + "Anchors";
@@ -301,7 +305,9 @@ void LoadINI()
 
 			// Even entries are the anchor values. Add it to the list
 			if (pch)
+			{
 				vAnchors.push_back(pch);
+			}
 
 			// next anchor
 			pch = strtok_s(nullptr, "=", &Next_Token1);
@@ -311,9 +317,11 @@ void LoadINI()
 		p++;
 	}
 	if (!vAnchors.empty())
+	{
 		ListAnchors();
-	// flag first load init as done
+	}
 
+	// flag first load init as done
 	bInitDone = true;
 	bSettingsDirty = false;
 }
@@ -1042,10 +1050,14 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 {
 	// No users, abort
 	if (vNames.empty())
+	{
 		return false;
+	}
 
 	if (!pLocalPC)
+	{
 		return false;
+	}
 
 	if (bAutoAccept)
 	{
@@ -1118,17 +1130,25 @@ PLUGIN_API void OnPulse()
 	static int Pulse = 0;
 
 	if (GetGameState() != GAMESTATE_INGAME)
+	{
 		return;
+	}
 
 	if (!bInitDone)
+	{
 		return;
+	}
 
 	if (!bAutoAccept)
+	{
 		return;
+	}
 
 	// Process every 40 pulses
 	if (++Pulse < 40)
+	{
 		return;
+	}
 
 	Pulse = 0;
 
@@ -1225,7 +1245,10 @@ PLUGIN_API void OnPulse()
 					if (bTradeReject)
 					{
 						if (rejectTimer == 0)
+						{
 							rejectTimer = GetTickCount64() + 5000;
+						}
+
 						if (rejectTimer < GetTickCount64())
 						{
 							rejectTimer = 0;
