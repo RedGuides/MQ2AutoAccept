@@ -1277,8 +1277,7 @@ PLUGIN_API void OnPulse()
 				// rez request
 				//DebugSpew("\agIgnoring rez\ax");
 			}
-			else if (ci_find_substr(windowText, "translocated to your bind point") != -1 ||
-				ci_find_substr(windowText, "wish to be translocated by") != -1)
+			else if (ci_find_substr(windowText, "translocated to your bind point") != -1 || ci_find_substr(windowText, "wish to be translocated by") != -1)
 			{
 				// Translocate request
 				bool accept = false;
