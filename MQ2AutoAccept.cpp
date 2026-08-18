@@ -12,9 +12,11 @@
 // v2.12 - Sym - 08-07-2017 - Added wizard translocate and druid zephyr casts to translocate toggle. Previously it was translocate to bind only.
 // v2.13 - Eqmule - 06-04-2018 - Fixed a null ptr crash and added a check for a rez message so it wont accept that, its not this plugins job to accept rezzes.
 #include <mq/Plugin.h>
+#include "mq/imgui/ImGuiUtils.h"
 
 PreSetup("MQ2AutoAccept");
 PLUGIN_VERSION(2.13);
+#define PLUGINMSG "\ar[\a-tAutoAccept\ar]\ao:: "
 
 std::vector <std::string> vIniNames;
 std::vector <std::string> vGlobalNames;
@@ -25,7 +27,13 @@ constexpr int MAX_TRADE_COIN_SLOTS = 4;
 
 char szList[MAX_STRING];
 bool bAutoAccept = false;
-bool bTranslocate = false;
+enum class eAcceptMode : int
+{
+	Never = 0,
+	Trusted = 1,
+	Always = 2,
+};
+eAcceptMode translocateMode = eAcceptMode::Never;
 bool bAnchor = false;
 bool bSelfAnchor = false;
 bool bTrade = true;
@@ -34,46 +42,89 @@ bool bGroup = true;
 bool bFellowship = true;
 bool bRaid = true;
 bool bInitDone = false;
+bool bSettingsDirty = false;
 bool bTradeReject = false;
 bool bUseServerNames = false;
+
+const char* AcceptModeToString(eAcceptMode mode)
+{
+	switch (mode)
+	{
+		case eAcceptMode::Always:
+			return "Always";
+		case eAcceptMode::Trusted:
+			return "Trusted";
+		default:
+			return "Never";
+	}
+}
+
+eAcceptMode AcceptModeFromString(const std::string_view str, eAcceptMode fallback = eAcceptMode::Never)
+{
+	// on/1 for legacy compatability
+	if (ci_equals(str, "always") || ci_equals(str, "on") || ci_equals(str, "1"))
+	{
+		return eAcceptMode::Always;
+	}
+
+	if (ci_equals(str, "trusted"))
+	{
+		return eAcceptMode::Trusted;
+	}
+
+	// off/0 for legacy compatability
+	if (ci_equals(str, "never") || ci_equals(str, "off") || ci_equals(str, "0"))
+	{
+		return eAcceptMode::Never;
+	}
+
+	return fallback;
+}
 
 ULONGLONG rejectTimer = 0;
 
 
-void CombineNames() {
+void CombineNames()
+{
 	vNames.clear();
 	for (auto& vRef : vGlobalNames)
 	{
 		vNames.emplace_back(vRef);
 	}
+
 	for (auto& vRef : vIniNames)
 	{
 		vNames.emplace_back(vRef);
 	}
 }
 
-bool WindowOpen(PCHAR WindowName) {
-	const auto pWnd = dynamic_cast<CSidlScreenWnd*>(FindMQ2Window(WindowName));
+bool WindowOpen(const char* WindowName)
+{
+	const auto pWnd = static_cast<CSidlScreenWnd*>(FindMQ2Window(WindowName));
 	return pWnd && pWnd->IsVisible();
 }
 
-void ListUsers() {
-	WriteChatf("User list contains \ay%d\ax %s", vNames.size(), vNames.size() > 1 ? "entries" : "entry");
-	for (unsigned int a = 0; a < vNames.size(); a++) {
+void ListUsers()
+{
+	WriteChatf(PLUGINMSG "User list contains \ay%d\ax %s", static_cast<int>(vNames.size()), vNames.size() != 1 ? "entries" : "entry");
+	for (unsigned int a = 0; a < vNames.size(); a++)
+	{
 		std::string& vRef = vNames[a];
-		WriteChatf("\at%d: %s\ax", a+1, vRef.c_str());
+		WriteChatf(PLUGINMSG "\at%d: %s\ax", a+1, vRef.c_str());
 	}
 }
 
-void ListAnchors() {
-	WriteChatf("Anchor list contains \ay%d\ax %s", vAnchors.size(), vAnchors.size() > 1 ? "entries" : "entry");
-	for (unsigned int a = 0; a < vAnchors.size(); a++) {
+void ListAnchors()
+{
+	WriteChatf(PLUGINMSG "Anchor list contains \ay%d\ax %s", static_cast<int>(vAnchors.size()), vAnchors.size() != 1 ? "entries" : "entry");
+	for (unsigned int a = 0; a < vAnchors.size(); a++)
+	{
 		std::string& vRef = vAnchors[a];
-		WriteChatf("\at%d: %s\ax", a+1, vRef.c_str());
+		WriteChatf(PLUGINMSG "\at%d: %s\ax", a+1, vRef.c_str());
 	}
 }
 
-std::string GetPrefix(bool UseServerNames)
+std::string GetPrefix(const bool UseServerNames)
 {
 	std::string Prefix = "unknown";
 	if (pLocalPC)
@@ -97,7 +148,7 @@ void SaveINI()
 	std::string strSettings = Prefix + "Settings";
 	WritePrivateProfileSection(strSettings, "", INIFileName);
 	WritePrivateProfileBool(strSettings, "Enabled", bAutoAccept, INIFileName);
-	WritePrivateProfileBool(strSettings, "Translocate", bTranslocate, INIFileName);
+	WritePrivateProfileString(strSettings, "Translocate", AcceptModeToString(translocateMode), INIFileName);
 	WritePrivateProfileBool(strSettings, "Anchor", bAnchor, INIFileName);
 	WritePrivateProfileBool(strSettings, "SelfAnchor", bSelfAnchor, INIFileName);
 	WritePrivateProfileBool(strSettings, "Trade", bTrade, INIFileName);
@@ -119,20 +170,23 @@ void SaveINI()
 	// write all anchors
 	std::string strAnchors = Prefix + "Anchors";
 	WritePrivateProfileSection(strAnchors.c_str(), "", INIFileName);
-	for (unsigned int a = 0; a < vAnchors.size(); a++) {
+	for (unsigned int a = 0; a < vAnchors.size(); a++)
+	{
 		std::string& vRef = vAnchors[a];
-		sprintf_s(szA,"Anchor%d",a);
+		sprintf_s(szA, "Anchor%d", a);
 		WritePrivateProfileString(strAnchors, szA, vRef, INIFileName);
 	}
-	WriteChatf("MQ2AutoAccept :: Settings updated");
+	WriteChatf(PLUGINMSG "\awSettings updated");
+	bSettingsDirty = false;
 }
 
 void LoadINI()
 {
 	// get on/off settings
-	PCHARINFO pChar = GetCharInfo();
-	if (!pChar)
+	if (!pLocalPC)
+	{
 		return;
+	}
 
 	bUseServerNames = GetPrivateProfileBool("General", "UseServerNames", bUseServerNames, INIFileName);
 
@@ -141,7 +195,7 @@ void LoadINI()
 	std::string strSettings = Prefix + "Settings";
 
 	bAutoAccept = GetPrivateProfileBool(strSettings, "Enabled", true, INIFileName);
-	bTranslocate = GetPrivateProfileBool(strSettings, "Translocate", false, INIFileName);
+	translocateMode = AcceptModeFromString(GetPrivateProfileString(strSettings, "Translocate", "Never", INIFileName));
 	bAnchor = GetPrivateProfileBool(strSettings, "Anchor", false, INIFileName);
 	bSelfAnchor = GetPrivateProfileBool(strSettings, "SelfAnchor", false, INIFileName);
 	bTrade = GetPrivateProfileBool(strSettings, "Trade", true, INIFileName);
@@ -172,7 +226,7 @@ void LoadINI()
 	{
 		length = strlen(p);
 		// split entries on =
-		pch = strtok_s(p,"=",&Next_Token1);
+		pch = strtok_s(p, "=", &Next_Token1);
 		while (pch != nullptr)
 		{
 			// Odd entries are the names. Add it to the list
@@ -189,7 +243,7 @@ void LoadINI()
 		p++;
 	}
 	// if we have entries show them
-	GetPrivateProfileSection("Global_Names",szList,MAX_STRING,INIFileName);
+	GetPrivateProfileSection("Global_Names", szList, MAX_STRING, INIFileName);
 	vGlobalNames.clear();
 
 	p = (char*)szList;
@@ -202,17 +256,17 @@ void LoadINI()
 	{
 		length = strlen(p);
 		// split entries on =
-		pch = strtok_s(p,"=",&Next_Token1);
+		pch = strtok_s(p, "=", &Next_Token1);
 		while (pch != nullptr)
 		{
 			// Odd entries are the names. Add it to the list
 			vGlobalNames.push_back(pch);
 
 			// next is value. Don't use it so skip it
-			pch = strtok_s(nullptr, "=",&Next_Token1);
+			pch = strtok_s(nullptr, "=", &Next_Token1);
 
 			// next name
-			pch = strtok_s(nullptr, "=",&Next_Token1);
+			pch = strtok_s(nullptr, "=", &Next_Token1);
 			i++;
 		}
 		p += length;
@@ -222,7 +276,9 @@ void LoadINI()
 	// if we have entries show them
 	CombineNames();
 	if (vNames.size())
+	{
 		ListUsers();
+	}
 
 	// get all anchors
 	std::string strAnchors = Prefix + "Anchors";
@@ -241,333 +297,820 @@ void LoadINI()
 	{
 		length = strlen(p);
 		// split entries on =
-		pch = strtok_s(p,"=",&Next_Token1);
+		pch = strtok_s(p, "=", &Next_Token1);
 		while (pch != nullptr)
 		{
 			// Odd values are the numbered entries. Don't use it so skip it
-			pch = strtok_s(nullptr, "=",&Next_Token1);
+			pch = strtok_s(nullptr, "=", &Next_Token1);
 
 			// Even entries are the anchor values. Add it to the list
-			if(pch)
+			if (pch)
+			{
 				vAnchors.push_back(pch);
+			}
 
 			// next anchor
-			pch = strtok_s(nullptr, "=",&Next_Token1);
+			pch = strtok_s(nullptr, "=", &Next_Token1);
 			i++;
 		}
 		p += length;
 		p++;
 	}
 	if (!vAnchors.empty())
+	{
 		ListAnchors();
-	// flag first load init as done
+	}
 
+	// flag first load init as done
 	bInitDone = true;
+	bSettingsDirty = false;
 }
 
-PLUGIN_API void SetGameState(int GameState) {
-	if(GameState==GAMESTATE_INGAME) {
+PLUGIN_API void SetGameState(const int GameState)
+{
+	if (GameState == GAMESTATE_INGAME)
+	{
 		if (!bInitDone)
+		{
 			LoadINI();
-	} else if(GameState!=GAMESTATE_LOGGINGIN) {
+		}
+	}
+	else if (GameState != GAMESTATE_LOGGINGIN)
+	{
 		if (bInitDone)
-			bInitDone=false;
+		{
+			bInitDone = false;
+		}
 	}
 }
 
-void ShowHelp() {
-	WriteChatf("\atMQ2AutoAccept :: v%1.2f :: by Sym for RedGuides.com\ax", MQ2Version);
-	WriteChatf("/autoaccept :: Lists command syntax");
-	WriteChatf("/autoaccept on|off :: Main accept toggle. Nothing else will accept if this is off. Default \ag*ON*\ax");
-	WriteChatf("/autoaccept translocate on|off :: Toggle acceptance of translocate or zephyr port.  Default \ar*OFF*\ax");
-	WriteChatf("/autoaccept anchor on|off :: Toggle acceptance of primary/secondary real estate anchor port.  Default \ar*OFF*\ax");
-	WriteChatf("/autoaccept selfanchor on|off :: Toggle acceptance of primary/secondary real estate anchor port when you cast it.  Default \ar*OFF*\ax");
-	WriteChatf("/autoaccept trade on|off :: Toggle acceptance of trades by people on the auto accept list. Default \ag*ON*\ax");
-	WriteChatf("/autoaccept trade always on|off :: Toggles always accept all trades. Default \ar*OFF*\ax");
-	WriteChatf("/autoaccept trade reject on|off :: Reject trades for people not on auto accept list after 5 seconds. Default \ar*OFF*\ax");
-	WriteChatf("/autoaccept group on|off :: Toggles accept group invites. Default \ag*ON*\ax");
-	WriteChatf("/autoaccept fellowship on|off :: Toggles accept fellowship invites. Default \ag*ON*\ax");
-	WriteChatf("/autoaccept raid on|off :: Toggles accept raid invites. Default \ag*ON*\ax");
-	WriteChatf("/autoaccept status :: Lists status of toggles.");
-	WriteChatf("/autoaccept list :: Lists users on your auto accept list.");
-	WriteChatf("/autoaccept save :: Saves settings to ini. Changes \arDO NOT\ax auto save.");
-	WriteChatf("/autoaccept load :: Loads settings from ini");
-	WriteChatf("/autoaccept add NAME :: Add NAME to the auto accept list.");
-	WriteChatf("/autoaccept del NAME :: Delete NAME from your auto accept list.");
-	WriteChatf("/autoaccept addanchor VALUE :: Add VALUE as a valid anchor target. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
-	WriteChatf("/autoaccept delanchor VALUE :: Delete VALUE from your valid anchor target list. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
+void ShowHelp()
+{
+	WriteChatf(PLUGINMSG "\atv%1.2f :: by Sym for RedGuides.com\ax", MQ2Version);
+	WriteChatf(PLUGINMSG "\ay/autoaccept \ao::\aw Lists command syntax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \agon\aw|\aroff \ao::\aw Main accept toggle. Nothing else will accept if this is off. Default \ag*ON*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \attranslocate \agalways\aw|\aotrusted\aw|\arnever \ao::\aw Accept translocate/zephyr casts. Always = anyone, Trusted = only names on your list, Never = ignore. Default \ar*NEVER*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \atanchor \agon\aw|\aroff \ao::\aw Toggle acceptance of primary/secondary real estate anchor port.  Default \ar*OFF*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \atselfanchor \agon\aw|\aroff \ao::\aw Toggle acceptance of primary/secondary real estate anchor port when you cast it.  Default \ar*OFF*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \attrade \agon\aw|\aroff \ao::\aw Toggle acceptance of trades by people on the auto accept list. Default \ag*ON*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \attrade always \agon\aw|\aroff \ao::\aw Toggles always accept all trades. Default \ar*OFF*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \attrade reject \agon\aw|\aroff \ao::\aw Reject trades for people not on auto accept list after 5 seconds. Default \ar*OFF*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \atgroup \agon\aw|\aroff \ao::\aw Toggles accept group invites. Default \ag*ON*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \atfellowship \agon\aw|\aroff \ao::\aw Toggles accept fellowship invites. Default \ag*ON*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \atraid \agon\aw|\aroff \ao::\aw Toggles accept raid invites. Default \ag*ON*\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \agstatus \ao::\aw Lists status of toggles.");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \aglist \ao::\aw Lists users on your auto accept list.");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \agsave \ao::\aw Saves settings to ini. Changes \arDO NOT\ax auto save.");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \agload \ao::\aw Loads settings from ini");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \agadd \atNAME \ao::\aw Add NAME to the auto accept list.");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \ardel \atNAME \ao::\aw Delete NAME from your auto accept list.");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \agaddanchor \atVALUE \ao::\aw Add VALUE as a valid anchor target. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
+	WriteChatf(PLUGINMSG "\ay/autoaccept \ardelanchor \atVALUE \ao::\aw Delete VALUE from your valid anchor target list. Put the entire address inside quotes as it shows in the portal dialog box such as \ag\"Willow Circle Bay, 100 Vanward Heights\"\ax");
 }
 
-void AutoAcceptCommand(PSPAWNINFO pCHAR, PCHAR zLine) {
-	char szTemp[MAX_STRING] = { 0 };
-	GetArg(szTemp,zLine,1);
+bool ParseOnOff(const char* arg, bool& outValue)
+{
+	if (ci_equals(arg, "on"))
+	{
+		outValue = true;
+		return true;
+	}
 
-	if(!_strnicmp(szTemp,"load",4)) {
+	if (ci_equals(arg, "off"))
+	{
+		outValue = false;
+		return true;
+	}
+
+	return false;
+}
+
+void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine)
+{
+	char szTemp[MAX_STRING] = { 0 };
+	GetArg(szTemp, zLine, 1);
+
+	if (ci_equals(szTemp, "load"))
+	{
 		LoadINI();
 		return;
 	}
-	if(!_strnicmp(szTemp,"save",4)) {
+
+	if (ci_equals(szTemp, "save"))
+	{
 		SaveINI();
 		return;
 	}
 
-	if(!_strnicmp(szTemp,"status",6)) {
-		WriteChatf("MQ2AutoAccept :: %s", bAutoAccept ? "\agENABLED\ax" : "\arDISABLED\ax");
-		WriteChatf("MQ2AutoAccept :: Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
-		WriteChatf("MQ2AutoAccept :: Translocate accept is %s", bTranslocate ? "\agON\ax" : "\arOFF\ax");
+	if (ci_equals(szTemp, "status"))
+	{
+		WriteChatf(PLUGINMSG "%s", bAutoAccept ? "\agENABLED\ax" : "\arDISABLED\ax");
+		WriteChatf(PLUGINMSG "Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Translocate accept is \at%s\ax", AcceptModeToString(translocateMode));
 		return;
 	}
 
-	if(!_strnicmp(szTemp,"on",2)) {
-		bAutoAccept = true;
-		WriteChatf("MQ2AutoAccept :: \agEnabled\ax");
+	if (ParseOnOff(szTemp, bAutoAccept))
+	{
+		WriteChatf(PLUGINMSG "%s", bAutoAccept ? "\agEnabled\ax" : "\arDisabled\ax");
+		bSettingsDirty = true;
 	}
-	else if(!_strnicmp(szTemp,"off",3)) {
-		bAutoAccept = false;
-		WriteChatf("MQ2AutoAccept :: \arDisabled\ax");
+	else if (ci_equals(szTemp, "gui") || ci_equals(szTemp, "ui"))
+	{
+		DoCommand("/mqsettings plugins/autosize");
 	}
-	else if(!_strnicmp(szTemp,"list",4)) {
+	else if (ci_equals(szTemp, "list"))
+	{
 		ListUsers();
 		ListAnchors();
 	}
-	else if(!_strnicmp(szTemp,"addanchor",9)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strcmpi(szTemp, "")) {
-			WriteChatf("Usage: /autoaccept addanchor \"VALUE\"");
+	else if (ci_equals(szTemp, "addanchor"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (szTemp[0] == '\0')
+		{
+			WriteChatf(PLUGINMSG "Usage: /autoaccept addanchor \"VALUE\"");
 			return;
 		}
-		for (unsigned int a = 0; a < vAnchors.size(); a++) {
+
+		for (unsigned int a = 0; a < vAnchors.size(); a++)
+		{
 			std::string& vRef = vAnchors[a];
-			if (!_strcmpi(szTemp,vRef.c_str())) {
-				WriteChatf("MQ2AutoAccept :: Anchor \ay%s\ax already exists", szTemp);
+			if (ci_equals(szTemp, vRef))
+			{
+				WriteChatf(PLUGINMSG "Anchor \ay%s\ax already exists", szTemp);
 				return;
 			}
 		}
 		vAnchors.push_back(szTemp);
-		WriteChatf("MQ2AutoAccept :: Added \ay%s\ax to anchor list", szTemp);
+		WriteChatf(PLUGINMSG "Added \ay%s\ax to anchor list", szTemp);
+		bSettingsDirty = true;
 	}
-	else if(!_strnicmp(szTemp,"add",3)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strcmpi(szTemp, "")) {
-			WriteChatf("Usage: /autoaccept add NAME");
+	else if (ci_equals(szTemp, "add"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (szTemp[0] == '\0')
+		{
+			WriteChatf(PLUGINMSG "Usage: /autoaccept add NAME");
 			return;
 		}
-		for (unsigned int a = 0; a < vIniNames.size(); a++) {
+
+		for (unsigned int a = 0; a < vIniNames.size(); a++)
+		{
 			std::string& vRef = vIniNames[a];
-			if (!_strcmpi(szTemp,vRef.c_str())) {
-				WriteChatf("MQ2AutoAccept :: User \ay%s\ax already exists", szTemp);
+			if (ci_equals(szTemp, vRef))
+			{
+				WriteChatf(PLUGINMSG "User \ay%s\ax already exists", szTemp);
 				return;
 			}
 		}
+
 		vIniNames.push_back(szTemp);
 		CombineNames();
-		WriteChatf("MQ2AutoAccept :: Added \ay%s\ax to name list", szTemp);
+		WriteChatf(PLUGINMSG "Added \ay%s\ax to name list", szTemp);
+		bSettingsDirty = true;
 	}
-	else if(!_strnicmp(szTemp,"delanchor",9)) {
+	else if (ci_equals(szTemp, "delanchor"))
+	{
 		int delIndex = -1;
-		GetArg(szTemp,zLine,2);
-		for (unsigned int a = 0; a < vAnchors.size(); a++) {
+		GetArg(szTemp, zLine, 2);
+		for (unsigned int a = 0; a < vAnchors.size(); a++)
+		{
 			std::string& vRef = vAnchors[a];
-			if (!_strcmpi(szTemp,vRef.c_str())) {
+			if (ci_equals(szTemp, vRef))
+			{
 				delIndex = a;
 			}
 		}
-		if (delIndex >= 0) {
+
+		if (delIndex >= 0)
+		{
 			vAnchors.erase(vAnchors.begin() + delIndex);
-			WriteChatf("MQ2AutoAccept :: Deleted anchor \ay%s\ax", szTemp);
-		} else {
-			WriteChatf("MQ2AutoAccept :: Anchor \ay%s\ax not found", szTemp);
+			WriteChatf(PLUGINMSG "Deleted anchor \ay%s\ax", szTemp);
+			bSettingsDirty = true;
+		}
+		else
+		{
+			WriteChatf(PLUGINMSG "Anchor \ay%s\ax not found", szTemp);
 		}
 	}
-	else if(!_strnicmp(szTemp,"del",3)) {
+	else if (ci_equals(szTemp, "del"))
+	{
 		int delIndex = -1;
-		GetArg(szTemp,zLine,2);
-		for (unsigned int a = 0; a < vIniNames.size(); a++) {
+		GetArg(szTemp, zLine, 2);
+		for (unsigned int a = 0; a < vIniNames.size(); a++)
+		{
 			std::string& vRef = vIniNames[a];
-			if (!_strcmpi(szTemp,vRef.c_str())) {
+			if (ci_equals(szTemp, vRef))
+			{
 				delIndex = a;
 			}
 		}
-		if (delIndex >= 0) {
-			CombineNames();
+
+		if (delIndex >= 0)
+		{
 			vIniNames.erase(vIniNames.begin() + delIndex);
-			WriteChatf("MQ2AutoAccept :: Deleted user \ay%s\ax", szTemp);
-		} else {
-			WriteChatf("MQ2AutoAccept :: User \ay%s\ax not found", szTemp);
+			CombineNames();
+			WriteChatf(PLUGINMSG "Deleted user \ay%s\ax", szTemp);
+			bSettingsDirty = true;
+		}
+		else
+		{
+			WriteChatf(PLUGINMSG "User \ay%s\ax not found", szTemp);
 		}
 	}
-	else if(!_strnicmp(szTemp,"selfanchor",10)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
-			bSelfAnchor = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
-			bSelfAnchor = false;
+	else if (ci_equals(szTemp, "selfanchor"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (ParseOnOff(szTemp, bSelfAnchor))
+		{
+			bSettingsDirty = true;
 		}
-		WriteChatf("MQ2AutoAccept :: Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Self anchor portal accept is %s", bSelfAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"anchor",6)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
-			bAnchor = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
-			bAnchor = false;
+	else if (ci_equals(szTemp, "anchor"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (ParseOnOff(szTemp, bAnchor))
+		{
+			bSettingsDirty = true;
 		}
-		WriteChatf("MQ2AutoAccept :: Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Anchor portal accept is %s", bAnchor ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"group",5)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
-			bGroup = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
-			bGroup = false;
+	else if (ci_equals(szTemp, "group"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (ParseOnOff(szTemp, bGroup))
+		{
+			bSettingsDirty = true;
 		}
-		WriteChatf("MQ2AutoAccept :: Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Group accept is %s", bGroup ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"fellowship",10)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
-			bFellowship = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
-			bFellowship = false;
+	else if (ci_equals(szTemp, "fellowship"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (ParseOnOff(szTemp, bFellowship))
+		{
+			bSettingsDirty = true;
 		}
-		WriteChatf("MQ2AutoAccept :: Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Fellowship accept is %s", bFellowship ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"raid",4)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
-			bRaid = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
-			bRaid = false;
+	else if (ci_equals(szTemp, "raid"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (ParseOnOff(szTemp, bRaid))
+		{
+			bSettingsDirty = true;
 		}
-		WriteChatf("MQ2AutoAccept :: Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Raid accept is %s", bRaid ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"trade",5)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
-			bTrade = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
-			bTrade = false;
-			bTradeAlways = false;
-		}
-		else if(!_strnicmp(szTemp,"reject",6)) {
-			GetArg(szTemp,zLine,3);
-			if(!_strcmpi(szTemp, "")) {
-				WriteChatf("Usage: /autoaccept trade reject on|off");
+	else if (ci_equals(szTemp, "trade"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (ci_equals(szTemp, "reject"))
+		{
+			GetArg(szTemp, zLine, 3);
+			if (szTemp[0] == '\0')
+			{
+				WriteChatf(PLUGINMSG "Usage: /autoaccept trade reject on|off");
 				return;
 			}
-			if(!_strnicmp(szTemp,"on",2)) {
-				bTrade = true;
-				bTradeReject = true;
-			} else if(!_strnicmp(szTemp,"off",3)) {
-				bTradeReject = false;
+			if (ParseOnOff(szTemp, bTradeReject))
+			{
+				if (bTradeReject)
+				{
+					bTrade = true;
+				}
+				bSettingsDirty = true;
 			}
-			WriteChatf("MQ2AutoAccept :: Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
+			WriteChatf(PLUGINMSG "Trade reject is %s", bTradeReject ? "\agON\ax" : "\arOFF\ax");
 			return;
 		}
-		else if(!_strnicmp(szTemp,"always",6)) {
-			GetArg(szTemp,zLine,3);
-			if(!_strcmpi(szTemp, "")) {
-				WriteChatf("Usage: /autoaccept trade always on|off");
+		else if (ci_equals(szTemp, "always"))
+		{
+			GetArg(szTemp, zLine, 3);
+			if (szTemp[0] == '\0')
+			{
+				WriteChatf(PLUGINMSG "Usage: /autoaccept trade always on|off");
 				return;
 			}
-			if(!_strnicmp(szTemp,"on",2)) {
-				bTrade = true;
-				bTradeAlways = true;
-			} else if(!_strnicmp(szTemp,"off",3)) {
+
+			if (ParseOnOff(szTemp, bTradeAlways))
+			{
+				if (bTradeAlways)
+				{
+					bTrade = true;
+				}
+				bSettingsDirty = true;
+			}
+			WriteChatf(PLUGINMSG "Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
+			return;
+		}
+		else if (ParseOnOff(szTemp, bTrade))
+		{
+			if (!bTrade)
+			{
 				bTradeAlways = false;
 			}
-			WriteChatf("MQ2AutoAccept :: Trade always accept is %s", bTradeAlways ? "\agON\ax" : "\arOFF\ax");
-			return;
+			bSettingsDirty = true;
 		}
-		WriteChatf("MQ2AutoAccept :: Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
+		WriteChatf(PLUGINMSG "Trade accept is %s", bTrade ? "\agON\ax" : "\arOFF\ax");
 	}
-	else if(!_strnicmp(szTemp,"translocate",11)) {
-		GetArg(szTemp,zLine,2);
-		if(!_strnicmp(szTemp,"on",2)) {
-			bTranslocate = true;
-		} else if(!_strnicmp(szTemp,"off",3)) {
-			bTranslocate = false;
+	else if (ci_equals(szTemp, "translocate"))
+	{
+		GetArg(szTemp, zLine, 2);
+		if (szTemp[0] == '\0')
+		{
+			WriteChatf(PLUGINMSG "Usage: /autoaccept translocate always|trusted|never");
 		}
-		WriteChatf("MQ2AutoAccept :: Translocate accept is %s", bTranslocate ? "\agON\ax" : "\arOFF\ax");
+		else
+		{
+			translocateMode = AcceptModeFromString(szTemp, translocateMode);
+			bSettingsDirty = true;
+		}
+		WriteChatf(PLUGINMSG "\agTranslocate accept is \ax\at%s\ax", AcceptModeToString(translocateMode));
 	}
-	else {
+	else
+	{
 		ShowHelp();
 	}
 }
 
+bool AddTrustedName(const std::string_view name)
+{
+	if (!name.empty())
+	{
+		return false;
+	}
+
+	for (const std::string& vRef : vIniNames)
+	{
+		if (ci_equals(name, vRef))
+		{
+			return false;
+		}
+	}
+
+	vIniNames.emplace_back(name);
+	return true;
+}
+
+void AddGroupToTrustedNames()
+{
+	bool addedAny = false;
+
+	if (pLocalPC && pLocalPC->Group)
+	{
+		for (int i = 0; i < MAX_GROUP_SIZE; ++i)
+		{
+			CGroupMember* pMember = pLocalPC->Group->GetGroupMember(i);
+			if (pMember && pMember->pSpawn)
+			{
+				if (AddTrustedName(pMember->pSpawn->Name))
+				{
+					addedAny = true;
+				}
+			}
+		}
+	}
+
+	if (addedAny)
+	{
+		CombineNames();
+		bSettingsDirty = true;
+	}
+}
+
+void AddRaidToTrustedNames()
+{
+	bool addedAny = false;
+
+	if (pRaid)
+	{
+		for (int i = 0; i < MAX_RAID_SIZE; ++i)
+		{
+			if (!pRaid->locations[i])
+			{
+				continue;
+			}
+
+			PlayerClient* thisMember = GetSpawnByName(pRaid->raidMembers[i].Name);
+			if (!thisMember)
+			{
+				continue;
+			}
+
+			if (AddTrustedName(thisMember->Name))
+			{
+				addedAny = true;
+			}
+		}
+	}
+
+	if (addedAny)
+	{
+		CombineNames();
+		bSettingsDirty = true;
+	}
+}
+
+static void DrawDoubleClickHint()
+{
+	float originalSize = ImGui::GetStyle().FontSizeBase;
+	float smallSize = originalSize * 0.80f;
+	float columnWidth = ImGui::GetColumnWidth();
+	const char* dblClickHint = "Double click to delete an entry from the list.";
+	ImGui::PushFont(nullptr, smallSize);
+	ImVec2 textSize = ImGui::CalcTextSize(dblClickHint);
+	float offset = (columnWidth - textSize.x) * 0.5f;
+	if (offset > 0.0f)
+	{
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offset);
+	}
+	ImGui::TextUnformatted(dblClickHint);
+	ImGui::PopFont();
+}
+
+void AutoAcceptImGuiSettingsPanel()
+{
+	ImGui::BeginDisabled(!bSettingsDirty);
+	if (ImGui::Button("Save"))
+	{
+		SaveINI();
+		bSettingsDirty = false;
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Changes below are not saved automatically. Click Save to write them to the ini.");
+	if (bSettingsDirty)
+	{
+		ImGui::SameLine();
+		ImGui::TextDisabled("(unsaved changes)");
+	}
+
+	ImGui::Separator();
+
+	if (ImGui::Checkbox("Enabled", &bAutoAccept))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Main accept toggle. Nothing else will accept if this is off.\n\nINI Setting: Enabled");
+
+	if (ImGui::Checkbox("Use server name prefix", &bUseServerNames))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Store settings/names/anchors per-server as well as per-character.\n\nINI Setting: General/UseServerNames");
+
+	ImGui::Separator();
+
+	if (ImGui::Checkbox("Group invites", &bGroup))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept group invites from people on your list.\n\nINI Setting: Group");
+
+	if (ImGui::Checkbox("Fellowship invites", &bFellowship))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept fellowship invites from people on your list.\n\nINI Setting: Fellowship");
+
+	if (ImGui::Checkbox("Raid invites", &bRaid))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept raid invites from people on your list.\n\nINI Setting: Raid");
+
+	ImGui::Separator();
+
+	if (ImGui::Checkbox("Anchor portal", &bAnchor))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept real estate anchor ports to destinations on your anchor list.\n\nINI Setting: Anchor");
+
+	if (ImGui::Checkbox("Self anchor portal", &bSelfAnchor))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept the primary/secondary real estate anchor port when you cast it yourself.\n\nINI Setting: SelfAnchor");
+
+	ImGui::Separator();
+
+	if (ImGui::Checkbox("Trade", &bTrade))
+	{
+		if (!bTrade)
+		{
+			bTradeAlways = false;
+		}
+
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept trades from people on your list.\n\nINI Setting: Trade");
+
+	ImGui::BeginDisabled(!bTrade);
+	ImGui::Indent();
+
+	if (ImGui::Checkbox("Always accept trades", &bTradeAlways))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Accept trades from anyone, not just people on your list.\n\nINI Setting: TradeAlways");
+
+	if (ImGui::Checkbox("Reject trades after 5s if not on list", &bTradeReject))
+	{
+		bSettingsDirty = true;
+	}
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Cancel trades from people not on your list after 5 seconds.\n\nINI Setting: TradeReject");
+
+	ImGui::Unindent();
+	ImGui::EndDisabled();
+
+	ImGui::Separator();
+
+	constexpr int iInputWidth = 150;
+	static const char* translocateOptions[] = { "Never", "Trusted", "Always" };
+
+	int currentMode = static_cast<int>(translocateMode);
+	ImGui::TextUnformatted("Accept translocate/zephyr casts:");
+	ImGui::SameLine();
+	mq::imgui::HelpMarker("Always = accept from anyone. Trusted = only accept from people on your list. Never = ignore.\n\nINI Setting: Translocate");
+	ImGui::SetNextItemWidth(iInputWidth);
+	if (ImGui::Combo("##TranslocateMode", &currentMode, translocateOptions, IM_ARRAYSIZE(translocateOptions)))
+	{
+		translocateMode = static_cast<eAcceptMode>(currentMode);
+		bSettingsDirty = true;
+	}
+
+	ImGui::Separator();
+
+	if (ImGui::BeginTabBar("##AutoAcceptListsTabBar"))
+	{
+		if (ImGui::BeginTabItem("Trusted Names"))
+		{
+			static char szNewName[MAX_STRING] = { 0 };
+			mq::imgui::HelpMarker("People on this list are auto-accepted for group/fellowship/raid invites, trusted translocates, and trades.\nGlobal_Names entries from the ini are not shown/editable here.");
+			ImGui::SameLine();
+			ImGui::TextUnformatted("Trusted Names");
+
+			if (ImGui::Button("Add Group"))
+			{
+				AddGroupToTrustedNames();
+			}
+			ImGui::SameLine();
+			mq::imgui::HelpMarker("Adds every current group member (including yourself) to the trusted names list.");
+
+			ImGui::SameLine();
+			if (ImGui::Button("Add Raid"))
+			{
+				AddRaidToTrustedNames();
+			}
+			ImGui::SameLine();
+			mq::imgui::HelpMarker("Adds every current raid member to the trusted names list.");
+
+			ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.45f);
+			bool submitName = ImGui::InputText("##NewName", szNewName, IM_ARRAYSIZE(szNewName), ImGuiInputTextFlags_EnterReturnsTrue);
+			ImGui::SameLine();
+			if ((ImGui::Button("Add##AddName") || submitName) && szNewName[0] != '\0')
+			{
+				bool exists = false;
+				for (const std::string& vRef : vIniNames)
+				{
+					if (ci_equals(szNewName, vRef.c_str()))
+					{
+						exists = true;
+						break;
+					}
+				}
+
+				if (!exists)
+				{
+					vIniNames.emplace_back(szNewName);
+					CombineNames();
+					bSettingsDirty = true;
+				}
+
+				szNewName[0] = '\0';
+			}
+
+			DrawDoubleClickHint();
+
+			if (ImGui::BeginTable("##AutoAcceptNameList", 1, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY, ImVec2(0, 150)))
+			{
+				ImGui::TableSetupColumn("Name");
+				ImGui::TableSetupScrollFreeze(0, 1);
+				ImGui::TableHeadersRow();
+
+				for (const std::string& name : vIniNames)
+				{
+					ImGui::PushID(name.c_str());
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(name.c_str());
+
+					// double click to remove
+					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+					{
+						auto it = std::find_if(vIniNames.begin(), vIniNames.end(),
+							[&name](const std::string& vRef) { return ci_equals(name, vRef); });
+						if (it != vIniNames.end())
+						{
+							vIniNames.erase(it);
+							CombineNames();
+							bSettingsDirty = true;
+						}
+					}
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+
+
+			ImGui::EndTabItem();
+		}
+
+		if (ImGui::BeginTabItem("Anchor Destinations"))
+		{
+			static char szNewAnchor[MAX_STRING] = { 0 };
+			mq::imgui::HelpMarker("Real estate anchor destinations that are auto-accepted when \"Anchor portal\" is on.\nUse the exact address as it appears in the portal confirmation dialog, e.g.\n\"Willow Circle Bay, 100 Vanward Heights\"");
+			ImGui::SameLine();
+			ImGui::TextUnformatted("Anchor Destinations");
+
+			ImGui::SetNextItemWidth(ImGui::GetWindowSize().x * 0.45f);
+			bool submitAnchor = ImGui::InputText("##NewAnchor", szNewAnchor, IM_ARRAYSIZE(szNewAnchor), ImGuiInputTextFlags_EnterReturnsTrue);
+			ImGui::SameLine();
+			if ((ImGui::Button("Add##AddAnchor") || submitAnchor) && szNewAnchor[0] != '\0')
+			{
+				bool exists = false;
+				for (const std::string& vRef : vAnchors)
+				{
+					if (ci_equals(szNewAnchor, vRef))
+					{
+						exists = true;
+						break;
+					}
+				}
+
+				if (!exists)
+				{
+					vAnchors.emplace_back(szNewAnchor);
+					bSettingsDirty = true;
+				}
+
+				szNewAnchor[0] = '\0';
+			}
+
+			DrawDoubleClickHint();
+
+			if (ImGui::BeginTable("##AutoAcceptAnchorList", 1, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY, ImVec2(0, 150)))
+			{
+				ImGui::TableSetupColumn("Anchor");
+				ImGui::TableSetupScrollFreeze(0, 1);
+				ImGui::TableHeadersRow();
+
+				for (const std::string& anchor : vAnchors)
+				{
+					ImGui::PushID(anchor.c_str());
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					ImGui::TextUnformatted(anchor.c_str());
+
+					// double click to remove
+					if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+					{
+						auto it = std::find_if(vAnchors.begin(), vAnchors.end(),
+							[&anchor](const std::string& vRef) { return ci_equals(anchor, vRef); });
+						if (it != vAnchors.end())
+						{
+							vAnchors.erase(it);
+							bSettingsDirty = true;
+						}
+					}
+
+					ImGui::PopID();
+				}
+
+				ImGui::EndTable();
+			}
+
+			DrawDoubleClickHint();
+
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
+	}
+}
 
 // Called once, when the plugin is to initialize
-PLUGIN_API void InitializePlugin() {
+PLUGIN_API void InitializePlugin()
+{
 	DebugSpewAlways("Initializing MQ2AutoAccept");
-	AddCommand("/autoaccept",AutoAcceptCommand);
+	AddCommand("/autoaccept", AutoAcceptCommand);
+
+	AddSettingsPanel("plugins/AutoAccept", AutoAcceptImGuiSettingsPanel);
 }
 
 // Called once, when the plugin is to shutdown
-PLUGIN_API void ShutdownPlugin() {
+PLUGIN_API void ShutdownPlugin()
+{
 	DebugSpewAlways("Shutting down MQ2AutoAccept");
 	RemoveCommand("/autoaccept");
+
+	RemoveSettingsPanel("plugins/AutoAccept");
 }
 
-// TODO: This signature should be const char* but need to fix use of GetArg below.
-PLUGIN_API bool OnIncomingChat(PCHAR Line, DWORD Color)
+bool IsInviter(std::string_view name)
+{
+	return std::find_if(vNames.begin(), vNames.end(),
+		[name](const std::string& key) { return ci_equals(name, key); }) != vNames.end();
+}
+
+PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 {
 	// No users, abort
 	if (vNames.empty())
+	{
 		return false;
+	}
 
-	PCHARINFO pChar = GetCharInfo();
-	if (!pChar)
+	if (!pLocalPC)
+	{
 		return false;
+	}
 
-	if (bAutoAccept) {
+	if (bAutoAccept)
+	{
 		char szName[MAX_STRING] = { 0 };
-		if (strstr(Line, "invites you to join a group.") && bGroup) {
+		// group invitations are done onpulse
+		// so here we will do fellowship and raid invitations
+		if (bFellowship && ci_find_substr(Line, "invites you to join a fellowship.") != -1)
+		{
 			GetArg(szName, Line, 1);
-			// loop through user list and find a match for inviter. If found join group
-			for (auto& vRef : vNames)
+			if (IsInviter(szName))
 			{
-				if (!_strcmpi(szName, vRef.c_str())) {
-					DoCommand(pChar->pSpawn, "/timed 3s /invite");
-					WriteChatf("\agMQ2AutoAccept :: Joining group with %s\ax", szName);
-				}
+				DoCommand("/timed 3s /invite");
+				WriteChatf(PLUGINMSG "\agJoining fellowship with %s\ax", szName);
 			}
 		}
-		else if (strstr(Line, "invites you to join a fellowship.") && bFellowship) {
+		else if (bRaid && ci_find_substr(Line, "invites you to join a raid") != -1)
+		{
 			GetArg(szName, Line, 1);
-			// loop through user list and find a match for inviter. If found join group
-			for (auto& vRef : vNames)
+			if (IsInviter(szName))
 			{
-				if (!_strcmpi(szName, vRef.c_str())) {
-					DoCommand(pChar->pSpawn, "/timed 3s /invite");
-					WriteChatf("\agMQ2AutoAccept :: Joining fellowship with %s\ax", szName);
-				}
-			}
-		}
-		else if (strstr(Line, "invites you to join a raid") && bRaid) {
-			GetArg(szName, Line, 1);
-			// loop through user list and find a match for inviter. If found join raid
-			for (auto& vRef : vNames)
-			{
-				if (!_strcmpi(szName, vRef.c_str())) {
-					DoCommand(pChar->pSpawn, "/timed 3s /raidaccept");
-					WriteChatf("\agMQ2AutoAccept :: Joining raid with %s\ax", szName);
-				}
+				DoCommand("/timed 3s /raidinvite");
+				WriteChatf(PLUGINMSG "\agJoining raid with %s\ax", szName);
 			}
 		}
 	}
 	return false;
 }
 
-void WinClick(CXWnd* Wnd, const char* ScreenID, const char* ClickNotification, DWORD KeyState) {
-	if (Wnd && pWndMgr) {
-		if (CXWnd* Child = Wnd->GetChildItem(ScreenID)) {
+void CheckAndAcceptGroupInvite()
+{
+	if (bAutoAccept && bGroup)
+	{
+		if (pLocalPlayer && pLocalPlayer->InvitedToGroup)
+		{
+			const char* invitername = pEverQuestInfo->Inviter;
+			if (invitername[0] != '\0')
+			{
+				if (IsInviter(invitername))
+				{
+					DoCommand("/timed 3s /invite");
+					WriteChatf(PLUGINMSG "\agJoining group with %s\ax", invitername);
+				}
+			}
+		}
+	}
+}
+
+void WinClick(CXWnd* Wnd, const char* ScreenID, const char* ClickNotification, DWORD KeyState)
+{
+	if (Wnd && pWndMgr)
+	{
+		if (CXWnd* Child = Wnd->GetChildItem(ScreenID))
+		{
 			bool KeyboardFlags[4];
 			static_assert(sizeof(KeyboardFlags) == sizeof(pWndMgr->KeyboardFlags));
 
@@ -587,90 +1130,132 @@ PLUGIN_API void OnPulse()
 	static int Pulse = 0;
 
 	if (GetGameState() != GAMESTATE_INGAME)
+	{
 		return;
+	}
 
 	if (!bInitDone)
+	{
 		return;
+	}
 
 	if (!bAutoAccept)
+	{
 		return;
+	}
 
 	// Process every 40 pulses
 	if (++Pulse < 40)
+	{
 		return;
+	}
 
 	Pulse = 0;
 
 	bool clickTrade = false;
 	bool givingItem = false;
 
+	CheckAndAcceptGroupInvite();
+
 	// if we've clicked trade no need to check anything, let other person accept or reject
-	if (pTradeWnd && pTradeWnd->IsVisible() && !pTradeWnd->bMyReadyTrade) {
-		if (pTradeWnd->bHisReadyTrade) {
-			if (!pTradeWnd->HisNameLabel) {
-				WriteChatf("\arTrade window is not initialized properly! New UI may be enabled or Trade window UI XML might be bad. Temporarily disabling MQ2AutoAccept.");
+	if (pTradeWnd && pTradeWnd->IsVisible() && !pTradeWnd->bMyReadyTrade)
+	{
+		if (pTradeWnd->bHisReadyTrade)
+		{
+			if (!pTradeWnd->HisNameLabel)
+			{
+				WriteChatf(PLUGINMSG "\arTrade window is not initialized properly! New UI may be enabled or Trade window UI XML might be bad. Temporarily disabling MQ2AutoAccept.");
 				bAutoAccept = false;
 				return;
 			}
 			CXStr theirName = pTradeWnd->HisNameLabel->GetText();
-			if (bTradeAlways) {
+
+			if (bTradeAlways)
+			{
 				clickTrade = true;
-			} else {
-				if (!theirName.empty()) {
+			}
+			else
+			{
+				if (!theirName.empty())
+				{
 					for (auto& vRef : vNames)
 					{
-						if (ci_equals(theirName, vRef)) {
+						if (ci_equals(theirName, vRef))
+						{
 							clickTrade = true;
 							break;
 						}
 					}
 				}
 			}
+
 			// Check only the first half of the trade slots (ours)
-			for (int n = 0; n < MAX_TRADE_SLOTS / 2; ++n) {
+			for (int n = 0; n < MAX_TRADE_SLOTS / 2; ++n)
+			{
 				std::string strSlotName = "TRDW_TradeSlot" + std::to_string(n);
-				if (CXWnd* pTRDW_TradeSlotWnd = pTradeWnd->GetChildItem(&strSlotName[0])) {
+				if (CXWnd* pTRDW_TradeSlotWnd = pTradeWnd->GetChildItem(&strSlotName[0]))
+				{
 					const auto toolTip = pTRDW_TradeSlotWnd->GetTooltip();
-					if (!toolTip.empty()) {
-						//DebugSpew("Giving %s in slot %d",szTemp, n);
+					if (!toolTip.empty())
+					{
+						//DebugSpew("Giving %s in slot %d", szTemp, n);
 						givingItem = true;
 						break;
 					}
 				}
 			}
+
 			bool givingMoney = false;
-			for (int n = 0; n < MAX_TRADE_COIN_SLOTS; ++n) {
+			for (int n = 0; n < MAX_TRADE_COIN_SLOTS; ++n)
+			{
 				std::string strSlotName = "TRDW_MyMoney" + std::to_string(n);
-				if (CXWnd* pTRDW_MyMoneyWnd = pTradeWnd->GetChildItem(&strSlotName[0])) {
+				if (CXWnd* pTRDW_MyMoneyWnd = pTradeWnd->GetChildItem(&strSlotName[0]))
+				{
 					const auto windowText = pTRDW_MyMoneyWnd->GetWindowText();
-					if (!windowText.empty() && GetIntFromString(windowText, 0) > 0) {
-						//DebugSpew("Giving %s in slot %d",szTemp, n);
+					if (!windowText.empty() && GetIntFromString(windowText, 0) > 0)
+					{
+						//DebugSpew("Giving %s in slot %d", szTemp, n);
 						givingMoney = true;
 						break;
 					}
 				}
 			}
-			if (givingItem || givingMoney) {
+
+			if (givingItem || givingMoney)
+			{
 				// We're giving item or coin, don't auto do anything
 				//DebugSpew("We're giving item or coin, don't do anything");
-			} else {
-				if (clickTrade) {
-					if (!theirName.empty()) {
-						if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button")) {
-							WriteChatf("\agMQ2AutoAccept :: Accepting trade from %s\ax", theirName.c_str());
-							SendWndClick2(pTRDW_Trade_Button,"leftmouseup");
+			}
+			else
+			{
+				if (clickTrade)
+				{
+					if (!theirName.empty())
+					{
+						if (CXWnd* pTRDW_Trade_Button = pTradeWnd->GetChildItem("TRDW_Trade_Button"))
+						{
+							WriteChatf(PLUGINMSG "\agAccepting trade from %s\ax", theirName.c_str());
+							SendWndClick2(pTRDW_Trade_Button, "leftmouseup");
 							pTarget = nullptr;
 						}
 					}
-				} else {
-					if (bTradeReject) {
+				}
+				else
+				{
+					if (bTradeReject)
+					{
 						if (rejectTimer == 0)
+						{
 							rejectTimer = GetTickCount64() + 5000;
-						if (rejectTimer < GetTickCount64()) {
+						}
+
+						if (rejectTimer < GetTickCount64())
+						{
 							rejectTimer = 0;
-							if (CXWnd* pTRDW_Cancel_Button = pTradeWnd->GetChildItem("TRDW_Cancel_Button")) {
-								WriteChatf("\arMQ2AutoAccept :: Canceling Trade\ax");
-								SendWndClick2(pTRDW_Cancel_Button,"leftmouseup");
+							if (CXWnd* pTRDW_Cancel_Button = pTradeWnd->GetChildItem("TRDW_Cancel_Button"))
+							{
+								WriteChatf(PLUGINMSG "\arCanceling Trade\ax");
+								SendWndClick2(pTRDW_Cancel_Button, "leftmouseup");
 							}
 						}
 					}
@@ -679,53 +1264,95 @@ PLUGIN_API void OnPulse()
 		}
 	}
 
-	CXWnd* pWnd=(CXWnd *)FindMQ2Window("ConfirmationDialogBox");
-	if(pWnd && pWnd->IsVisible()) {
-		if(CXWnd* Child=pWnd->GetChildItem("CD_TextOutput")) {
+	CXWnd* pWnd = (CXWnd *)FindMQ2Window("ConfirmationDialogBox");
+	if (pWnd && pWnd->IsVisible())
+	{
+		if (CXWnd* Child = pWnd->GetChildItem("CD_TextOutput"))
+		{
 			CStmlWnd* cstm = (CStmlWnd*)Child;
 			CXStr windowText = cstm->STMLText;
 
-			if (ci_find_substr(windowText, "percent") != -1 || ci_find_substr(windowText, "return you to your corpse") != -1) {
+			if (ci_find_substr(windowText, "percent") != -1 || ci_find_substr(windowText, "return you to your corpse") != -1)
+			{
 				// rez request
-				//DebugSpew("\agMQ2AutoAccept :: Ignoring rez\ax");
+				//DebugSpew("\agIgnoring rez\ax");
 			}
-			else if (bTranslocate && (ci_find_substr(windowText, "translocated to your bind point") != -1 || ci_find_substr(windowText, "wish to be translocated by") != -1)) {
+			else if (ci_find_substr(windowText, "translocated to your bind point") != -1
+				|| ci_find_substr(windowText, "wish to be translocated by") != -1)
+			{
 				// Translocate request
-				WriteChatf("\agMQ2AutoAccept :: Accepting translocate\ax");
-				WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
-			}
-			else if (bAnchor && ci_find_substr(windowText, "to the real estate anchor in") != -1) {
-				// Anchor portal request
-				for (auto& vRef : vAnchors)
+				bool accept = false;
+				if (translocateMode == eAcceptMode::Always)
 				{
-					if (ci_find_substr(windowText, vRef) != -1) {
-						WriteChatf("\agMQ2AutoAccept :: Accepting anchor portal to \ax\at%s\ax", vRef.c_str());
-						WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
+					accept = true;
+				}
+				else if (translocateMode == eAcceptMode::Trusted)
+				{
+					for (auto& vRef : vNames)
+					{
+						if (ci_find_substr(windowText, vRef + " ") != -1 || ci_find_substr(windowText, vRef + "'s") != -1)
+						{
+							accept = true;
+							break;
+						}
+					}
+				}
+
+				if (accept)
+				{
+					WriteChatf(PLUGINMSG "\agAccepting translocate\ax");
+					WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+					return;
+				}
+			}
+			else if (ci_find_substr(windowText, "to the real estate anchor in") != -1)
+			{
+				// Anchor portal request
+				if (bAnchor)
+				{
+					for (auto& vRef : vAnchors)
+					{
+						if (ci_find_substr(windowText, vRef) != -1)
+						{
+							WriteChatf(PLUGINMSG "\agAccepting anchor portal to \ax\at%s\ax", vRef);
+							WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+							return;
+						}
 					}
 				}
 			}
-			else if (bSelfAnchor && ci_find_substr(windowText, "transport yourself to the real estate") != -1) {
+			else if (ci_find_substr(windowText, "transport yourself to the real estate") != -1)
+			{
 				// we cast the portal, accept it
-				WriteChatf("\agMQ2AutoAccept :: Accepting self anchor portal cast\ax");
-				WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+				if (bSelfAnchor)
+				{
+					WriteChatf(PLUGINMSG "\agAccepting self anchor portal cast\ax");
+					WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
+					return;
+				}
 			}
-			else if (ci_find_substr(windowText, "from the fellowship") != -1 && ci_find_substr(windowText, "Remove") != -1) {
+			else if (ci_find_substr(windowText, "from the fellowship") != -1 && ci_find_substr(windowText, "Remove") != -1)
+			{
 				// Remove someone from fellowship.
-				// DebugSpew("\agMQ2AutoAccept :: Ignoring removal from fellowship\ax");
+				// DebugSpew("\agIgnoring removal from fellowship\ax");
 			}
 			//none of the above? do we have any names
-			else if (!vNames.empty()) {
+			else if (!vNames.empty())
+			{
 				// All other confirmation boxes
 				for (auto& vRef : vNames)
 				{
-					if(ci_find_substr(windowText,vRef + " ") != -1 || ci_find_substr(windowText,vRef + "'s") != -1) {
-						if (pWnd->GetChildItem("Yes_Button")) {
-							WriteChatf("\agMQ2AutoAccept :: Clicking Yes\ax");
-							WinClick(FindMQ2Window("ConfirmationDialogBox"),"Yes_Button","leftmouseup",1);
+					if (ci_find_substr(windowText, vRef + " ") != -1 || ci_find_substr(windowText, vRef + "'s") != -1)
+					{
+						if (pWnd->GetChildItem("Yes_Button"))
+						{
+							WriteChatf(PLUGINMSG "\agClicking Yes\ax");
+							WinClick(FindMQ2Window("ConfirmationDialogBox"), "Yes_Button", "leftmouseup", 1);
 						}
-						else if (pWnd->GetChildItem("OK_Button")) {
-							WriteChatf("\agMQ2AutoAccept :: Clicking OK\ax");
-							WinClick(FindMQ2Window("ConfirmationDialogBox"),"OK_Button","leftmouseup",1);
+						else if (pWnd->GetChildItem("OK_Button"))
+						{
+							WriteChatf(PLUGINMSG "\agClicking OK\ax");
+							WinClick(FindMQ2Window("ConfirmationDialogBox"), "OK_Button", "leftmouseup", 1);
 						}
 						return;
 					}
