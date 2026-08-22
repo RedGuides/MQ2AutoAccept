@@ -422,9 +422,9 @@ void AutoAcceptCommand(PlayerClient* pCHAR, const char* zLine)
 		WriteChatf(PLUGINMSG "%s", bAutoAccept ? "\agEnabled\ax" : "\arDisabled\ax");
 		bSettingsDirty = true;
 	}
-	else if (ci_equals(szTemp, "gui") || ci_equals(szTemp, "ui"))
+	else if (ci_equals(szTemp, "gui") || ci_equals(szTemp, "ui") || ci_equals(szTemp, "show"))
 	{
-		DoCommand("/mqsettings plugins/autosize");
+		DoCommand("/mqsettings plugins/autoaccept");
 	}
 	else if (ci_equals(szTemp, "list"))
 	{
