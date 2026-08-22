@@ -1078,7 +1078,7 @@ PLUGIN_API bool OnIncomingChat(const char* Line, const unsigned int Color)
 			GetArg(szName, Line, 1);
 			if (IsInviter(szName))
 			{
-				DoCommand("/timed 3s /raidinvite");
+				DoCommand("/timed 3s /raidaccept");
 				WriteChatf(PLUGINMSG "\agJoining raid with %s\ax", szName);
 			}
 		}
@@ -1278,7 +1278,9 @@ PLUGIN_API void OnPulse()
 				//DebugSpew("\agIgnoring rez\ax");
 			}
 			else if (ci_find_substr(windowText, "translocated to your bind point") != -1
-				|| ci_find_substr(windowText, "wish to be translocated by") != -1)
+				|| ci_find_substr(windowText, "wish to be translocated by") != -1
+				// some translocates say "transported" instead of "translocated"
+				|| ci_find_substr(windowText, "wish to be transported by") != -1)
 			{
 				// Translocate request
 				bool accept = false;
